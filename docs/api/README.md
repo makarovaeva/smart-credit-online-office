@@ -1,0 +1,72 @@
+# API v1 (черновик)
+
+Спецификация: [`openapi.json`](openapi.json). Swagger UI — http://localhost:8000/docs.
+
+Эндпоинты пока заглушки (отвечают `501`), но контракт зафиксирован: фронтенд может работать по нему параллельно.
+
+Спека генерируется из кода (Pydantic-схемы + роутеры FastAPI). После изменения API:
+
+```bash
+cd backend && uv run python -m scripts.export_openapi
+```
+
+Тест `tests/test_openapi.py` падает, если `openapi.json` отстал от кода.
+
+## Соглашения
+
+- Префикс `/api/v1`, авторизация `Authorization: Bearer <JWT>`.
+- Ошибки: `{"detail": "..."}`. `404` — нет объекта или нет доступа к нему (не раскрываем существование чужих заявок), `409` — действие недопустимо в текущем статусе или устарела `version`, `422` — ошибка валидации.
+- Деньги — строкой (`"1500000.00"`), даты — ISO 8601 с таймзоной.
+- Списки — `limit`/`offset`, ответ `{items, total, limit, offset}`.
+- Смена статуса — отдельными командами (`/consents`, `/submit`, `/offer/accept`, ...), а не `PATCH status`: так каждое действие валидируется машиной состояний и попадает в аудит. Статусы описаны в [`../application-lifecycle.md`](../application-lifecycle.md).
+- `ApplicationRead.available_actions` — что клиенту можно сделать сейчас; фронт не дублирует логику статусов.
+
+## Эндпоинты
+
+### Клиент
+
+| Метод | Путь | Назначение |
+|---|---|---|
+| POST | `/auth/login` | Вход |
+| GET | `/me` | Пользователь и его компании |
+| GET | `/products` | Каталог продуктов |
+| POST | `/products/match` | Подбор продукта под цель, сумму и срок |
+| GET | `/companies/lookup?inn=` | Реквизиты и учредители из ЕГРЮЛ/ЕГРИП (мок) для предзаполнения |
+| POST/GET | `/companies` | Привязать компанию / мои компании |
+| POST/GET | `/applications` | Создать черновик / мои заявки |
+| GET/PATCH | `/applications/{id}` | Заявка / редактирование черновика |
+| POST/GET | `/applications/{id}/consents` | Согласия на получение данных: `draft → data_collection` |
+| GET | `/applications/{id}/pre-approval` | Предварительный лимит |
+| POST | `/applications/{id}/pre-approval/decline` | Не продолжать: `pre_approved → closed` |
+| POST | `/applications/{id}/submit` | Подать заявку: `pre_approved → submitted` |
+| GET | `/applications/{id}/history` | Таймлайн статусов |
+| POST/GET/DELETE | `/applications/{id}/documents[...]` | Документы |
+| GET | `/applications/{id}/info-requests` | Дозапросы (от ИИ или андеррайтера) |
+| POST | `/applications/{id}/info-requests/{rid}/answer` | Ответить: `need_additional_data → ai_financial_analysis` |
+| GET | `/applications/{id}/offer` | Оффер |
+| POST | `/applications/{id}/offer/accept`, `/reject` | Принять / отказаться от оффера |
+| POST | `/applications/{id}/sign` | Подписание (симуляция): `e_sign → disbursement → completed` |
+| GET | `/notifications`, POST `/notifications/{id}/read` | Уведомления в кабинете |
+
+### Банк
+
+| Метод | Путь | Роль | Назначение |
+|---|---|---|---|
+| GET | `/backoffice/applications` | аналитик, андеррайтер | Очередь с фильтрами по статусу, зоне риска, исполнителю |
+| GET | `/backoffice/applications/{id}` | аналитик, андеррайтер | Карточка: компания, учредители, проверки, метрики, скоринг, AI Credit Memo, решения, история |
+| POST | `/backoffice/applications/{id}/assign` | аналитик, андеррайтер | Назначить исполнителя |
+| POST | `/backoffice/applications/{id}/analyst-conclusion` | аналитик | Заключение: `analyst_escalation → analyst_completed → underwriter_review` |
+| POST | `/backoffice/applications/{id}/decision` | андеррайтер | Одно из 4 решений; `more_information_required` создаёт дозапрос |
+
+Этапы `data_collection`, `ai_*`, `decision_routing`, `contract_generation`, `disbursement` двигает конвейер, публичных эндпоинтов для них нет. Внешние источники (ЕГРЮЛ, ФНС, БКИ, ФССП, обороты РКО, цифровой профиль) — внутренние модули-моки в `app/integrations/`.
+
+## Открытые вопросы
+
+Пороги, не заданные в кредитной политике на доске:
+
+1. Числовой порог кредитного рейтинга.
+2. Допустимая долговая нагрузка и минимальный DSCR после выдачи.
+3. Лимит исполнительных производств.
+4. `FRAUD_SCORE threshold`.
+5. Приоритет пересекающихся правил.
+6. Срок действия оффера (`valid_until`).
