@@ -285,7 +285,7 @@
           "companies"
         ],
         "summary": "Lookup Company",
-        "description": "Предзаполнение реквизитов по ИНН из (мока) ЕГРЮЛ/ЕГРИП.",
+        "description": "Предзаполнение реквизитов по ИНН из (мока) ЕГРЮЛ/ЕГРИП.\nДемо-ИНН со сценариями - в docs/external-sources.md.",
         "operationId": "lookup_company_api_v1_companies_lookup_get",
         "security": [
           {
