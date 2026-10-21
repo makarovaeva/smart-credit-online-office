@@ -71,7 +71,9 @@ erDiagram
         numeric monthly_debt_payments
         string collateral_type
         numeric collateral_market_value
-        string close_reason
+        string collateral_address
+        text collateral_encumbrances
+        string close_reason "pre_approval_declined | auto_declined | underwriter_declined | offer_rejected"
         int version "optimistic lock"
     }
     application_consents {
@@ -83,6 +85,7 @@ erDiagram
         numeric amount_min
         numeric amount_max
         numeric estimated_rate
+        bool collateral_required
         jsonb recommendations
     }
     application_status_history {
@@ -121,12 +124,14 @@ erDiagram
         string ai_recommendation "approve | counter_offer | decline | request_more_info"
         numeric recommended_amount
         jsonb recommended_conditions
+        jsonb counter_offer_adjustments
         uuid analyst_id FK
         text analyst_conclusion
     }
     credit_decisions {
         string decision_type "approved | conditional_approval | declined | more_information_required"
         uuid decided_by_id FK "андеррайтер"
+        string more_info_target "client | credit_analyst"
         numeric approved_amount
         numeric interest_rate
         jsonb conditions
@@ -148,7 +153,11 @@ erDiagram
 | Деньги — `numeric(15,2)`, в API — строка | Без потерь точности float |
 | `scoring_results` → `credit_memos` → `credit_decisions` | По политике рекомендация ИИ отделена от финального решения: скоринг даёт метрики и зону, Credit Memo — рекомендацию ИИ и вывод аналитика, решение всегда за андеррайтером |
 | DSCR, Debt Burden, LTV, зона и confidence — отдельные колонки | По ним работает маршрутизация и фильтрация очереди бэкофиса; остальные метрики — в `metrics` (JSONB) |
-| `stop_factors`, `escalation_reasons`, `factors` в JSONB | Объяснимость: андеррайтер видит, почему заявка ушла к аналитику и что повлияло на оценку |
+| `stop_factors`, `escalation_reasons`, `factors` в JSONB | Объяснимость: андеррайтер видит, почему заявка ушла к аналитику или в автоотказ и что повлияло на оценку |
+| `credit_memos.counter_offer_adjustments` | Контр-предложение ИИ по сценариям политики (лимит, срок, Debt Burden, LTV, риск-надбавка): что и почему изменилось относительно запроса |
+| `credit_decisions.more_info_target` | У «нужны данные» два возвратных маршрута: документы от клиента или экспертиза аналитика |
+| `applications.close_reason` — enum | Четыре пути к финалу «Закрыто без выдачи» с доски; клиенту показывается причина |
+| `collateral_address`, `collateral_encumbrances`, `pre_approvals.collateral_required` | Консультация с залогом уточняет адрес и обременения; предварительный расчёт показывает необходимость обеспечения |
 | `collateral_type` + `collateral_market_value` | Дисконт для LTV зависит от типа залога (коммерческая недвижимость 0,2–0,3 … товар в обороте 0,5–0,7) |
 | `annual_ebitda` | Входит в DSCR = EBITDA / Debt Service и Debt Burden |
 | `application_consents` | Без согласий на БКИ/ФНС/цифровой профиль ИИ не начинает сбор данных (этап Draft) |

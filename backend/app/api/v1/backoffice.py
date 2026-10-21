@@ -43,8 +43,8 @@ async def list_applications(
     limit: Limit = 20,
     offset: Offset = 0,
 ) -> Page[BackofficeApplicationItem]:
-    """Очередь заявок, старые первыми. Аналитику по умолчанию - analyst_escalation,
-    андеррайтеру - underwriter_review."""
+    """Очередь заявок, старые первыми. Аналитику по умолчанию - analyst_escalation
+    (жёлтая зона и запросы экспертизы от андеррайтера), андеррайтеру - underwriter_review."""
     not_implemented()
 
 
@@ -67,8 +67,8 @@ async def assign(
 async def complete_analysis(
     application_id: uuid.UUID, body: AnalystConclusionRequest, analyst: CurrentAnalyst
 ) -> CreditMemoRead:
-    """Заключение кредитного аналитика дописывается в AI Credit Memo:
-    analyst_escalation -> analyst_completed -> underwriter_review."""
+    """Заключение кредитного аналитика дописывается в AI Credit Memo (или обновляется
+    по запросу андеррайтера): analyst_escalation -> analyst_completed -> underwriter_review."""
     not_implemented()
 
 
@@ -76,8 +76,9 @@ async def complete_analysis(
 async def make_decision(
     application_id: uuid.UUID, body: UnderwriterDecisionRequest, underwriter: CurrentUnderwriter
 ) -> DecisionRead:
-    """Финальное решение андеррайтера по AI Credit Memo:
-    approved / conditional_approval -> offer_generated,
-    more_information_required -> need_additional_data,
+    """Финальное решение андеррайтера по AI Credit Memo и/или заключению аналитика:
+    approved / conditional_approval (контр-предложение) -> offer_generated,
+    more_information_required + client -> need_additional_data (дозапрос формирует ИИ),
+    more_information_required + credit_analyst -> analyst_escalation,
     declined -> closed."""
     not_implemented()

@@ -14,29 +14,31 @@ TRANSITIONS: dict[tuple[ApplicationStatus, ApplicationStatus], frozenset[ActorTy
     (S.DRAFT, S.DATA_COLLECTION): CLIENT,  # клиент дал согласия на получение данных
     (S.DATA_COLLECTION, S.PRE_APPROVED): SYSTEM,
     (S.PRE_APPROVED, S.SUBMITTED): CLIENT,
-    # На доске финал этого отказа не определён - допущение: closed
-    (S.PRE_APPROVED, S.CLOSED): CLIENT,
+    (S.PRE_APPROVED, S.CLOSED): CLIENT,  # отказ после предварительного расчёта
     # Блок 02. Анализ ИИ
     (S.SUBMITTED, S.AI_VERIFICATION): SYSTEM,
     (S.AI_VERIFICATION, S.AI_FINANCIAL_ANALYSIS): SYSTEM,
     (S.AI_VERIFICATION, S.NEED_ADDITIONAL_DATA): SYSTEM,
-    (S.NEED_ADDITIONAL_DATA, S.AI_FINANCIAL_ANALYSIS): CLIENT,  # исправления получены
+    # Документы досланы: дозапрос ИИ - повторная проверка комплекта,
+    # дозапрос андеррайтера - сразу повторное рассмотрение
+    (S.NEED_ADDITIONAL_DATA, S.AI_VERIFICATION): CLIENT,
+    (S.NEED_ADDITIONAL_DATA, S.UNDERWRITER_REVIEW): CLIENT,
     (S.AI_FINANCIAL_ANALYSIS, S.AI_RISK_SCORING): SYSTEM,
     (S.AI_RISK_SCORING, S.NEED_ADDITIONAL_DATA): SYSTEM,
     (S.AI_RISK_SCORING, S.DECISION_ROUTING): SYSTEM,
-    # Высокий fraud-риск - единственное автоматическое закрытие без андеррайтера
-    (S.AI_VERIFICATION, S.CLOSED): SYSTEM,
-    (S.AI_FINANCIAL_ANALYSIS, S.CLOSED): SYSTEM,
-    (S.AI_RISK_SCORING, S.CLOSED): SYSTEM,
-    # Блок 03. Маршрутизация: зелёная зона - андеррайтеру, жёлтая/красная - аналитику
+    # Блок 03. Маршрутизация: зелёная зона - андеррайтеру, жёлтая - аналитику,
+    # красная (стоп-фактор) - автоотказ
     (S.DECISION_ROUTING, S.UNDERWRITER_REVIEW): SYSTEM,
     (S.DECISION_ROUTING, S.ANALYST_ESCALATION): SYSTEM,
+    (S.DECISION_ROUTING, S.CLOSED): SYSTEM,
     # Блок 04. Исключения
     (S.ANALYST_ESCALATION, S.ANALYST_COMPLETED): ANALYST,
     (S.ANALYST_COMPLETED, S.UNDERWRITER_REVIEW): SYSTEM,
     # Блок 05. Решения андеррайтера
     (S.UNDERWRITER_REVIEW, S.OFFER_GENERATED): UNDERWRITER,  # approved / conditional_approval
-    (S.UNDERWRITER_REVIEW, S.NEED_ADDITIONAL_DATA): UNDERWRITER,  # more_information_required
+    # more_information_required: документы у клиента или экспертиза аналитика
+    (S.UNDERWRITER_REVIEW, S.NEED_ADDITIONAL_DATA): UNDERWRITER,
+    (S.UNDERWRITER_REVIEW, S.ANALYST_ESCALATION): UNDERWRITER,
     (S.UNDERWRITER_REVIEW, S.CLOSED): UNDERWRITER,  # declined
     # Блок 06. Оффер
     (S.OFFER_GENERATED, S.OFFER_ACCEPTED): CLIENT,

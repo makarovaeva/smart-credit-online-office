@@ -13,6 +13,7 @@ from app.models.enums import (
     CheckSource,
     CheckStatus,
     DecisionType,
+    MoreInfoTarget,
     OfferResponse,
     RiskGrade,
     RiskZone,
@@ -61,9 +62,10 @@ class ScoringResult(UUIDPkMixin, CreatedAtMixin, Base):
     fraud_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
     # [{"code": "dscr", "value": 0.9, "impact": -35, "description": "..."}] - объяснимость
     factors: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
-    # [{"code": "account_blocked_115fz", "category": "legal", "description": "..."}]
+    # [{"code": "accounts_blocked_115fz", "category": "legal", "description": "..."}]
+    # Любой стоп-фактор - красная зона и автоотказ
     stop_factors: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
-    # Основания обязательной эскалации аналитику: confidence<80%, сумма >10 млн и т.д.
+    # Основания эскалации аналитику: confidence<80%, бизнес младше года, LTV>=70% и т.д.
     escalation_reasons: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
 
 
@@ -83,6 +85,9 @@ class CreditMemo(UUIDPkMixin, CreatedAtMixin, Base):
     recommended_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
     # Доп. условия рекомендации: залог, гарантия Корпорации МСП, поручительство собственника
     recommended_conditions: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
+    # Чем контр-предложение отличается от запроса:
+    # [{"scenario": "term_extension", "field": "term_months", "old_value": 24, "new_value": 36}]
+    counter_offer_adjustments: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
     # Заполняется на этапе analyst_escalation
     analyst_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
     analyst_conclusion: Mapped[str | None] = mapped_column(Text)
@@ -101,6 +106,8 @@ class CreditDecision(UUIDPkMixin, CreatedAtMixin, Base):
     decision_type: Mapped[DecisionType] = mapped_column(str_enum(DecisionType))
     decided_by_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     comment: Mapped[str | None] = mapped_column(Text)
+    # Для more_information_required: документы у клиента или экспертиза аналитика
+    more_info_target: Mapped[MoreInfoTarget | None] = mapped_column(str_enum(MoreInfoTarget))
     # Причины решения, понятные клиенту
     reasons: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
 

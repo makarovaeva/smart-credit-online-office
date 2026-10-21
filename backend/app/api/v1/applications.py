@@ -87,13 +87,15 @@ async def list_consents(application_id: ApplicationId, user: CurrentUser) -> lis
 
 @router.get("/{application_id}/pre-approval")
 async def get_pre_approval(application_id: ApplicationId, user: CurrentUser) -> PreApprovalRead:
-    """Вероятность одобрения, диапазон суммы, прогнозируемая ставка и рекомендации."""
+    """Вероятность одобрения, диапазон суммы, прогнозируемая ставка,
+    необходимость обеспечения и рекомендации."""
     not_implemented()
 
 
 @router.post("/{application_id}/pre-approval/decline", responses=CONFLICT)
 async def decline_pre_approval(application_id: ApplicationId, user: CurrentUser) -> ApplicationRead:
-    """Клиент не продолжает после предварительного расчёта: pre_approved -> closed."""
+    """Клиент не продолжает после предварительного расчёта: pre_approved -> closed
+    (close_reason = pre_approval_declined)."""
     not_implemented()
 
 
@@ -169,7 +171,8 @@ async def answer_info_request(
     user: CurrentUser,
 ) -> InfoRequestRead:
     """Ответить на дозапрос. Когда закрыты все открытые дозапросы:
-    need_additional_data -> ai_financial_analysis."""
+    дозапрос ИИ - need_additional_data -> ai_verification (повторная проверка комплекта),
+    дозапрос андеррайтера - need_additional_data -> underwriter_review."""
     not_implemented()
 
 
@@ -178,7 +181,8 @@ async def answer_info_request(
 
 @router.get("/{application_id}/offer")
 async def get_offer(application_id: ApplicationId, user: CurrentUser) -> OfferRead:
-    """Оффер: сумма, ставка, срок, условия и причины решения."""
+    """Оффер: сумма, ставка, срок, условия и причины решения.
+    decision_type = conditional_approval - контр-предложение на изменённых условиях."""
     not_implemented()
 
 
@@ -192,7 +196,7 @@ async def accept_offer(application_id: ApplicationId, user: CurrentUser) -> Appl
 async def reject_offer(
     application_id: ApplicationId, body: RejectOfferRequest, user: CurrentUser
 ) -> ApplicationRead:
-    """offer_generated -> offer_rejected -> closed."""
+    """offer_generated -> offer_rejected -> closed (close_reason = offer_rejected)."""
     not_implemented()
 
 
