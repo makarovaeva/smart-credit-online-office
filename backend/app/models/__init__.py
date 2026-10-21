@@ -1,0 +1,33 @@
+"""Импорт всех моделей, чтобы они попали в Base.metadata (нужно Alembic autogenerate)."""
+
+from app.models.application import (
+    Application,
+    ApplicationConsent,
+    ApplicationStatusHistory,
+    PreApproval,
+)
+from app.models.assessment import CreditDecision, CreditMemo, ExternalCheck, ScoringResult
+from app.models.company import Company, CompanyMember, CompanyOwner
+from app.models.document import Document, InfoRequest
+from app.models.notification import Notification
+from app.models.product import CreditProduct
+from app.models.user import User
+
+__all__ = [
+    "Application",
+    "ApplicationConsent",
+    "ApplicationStatusHistory",
+    "Company",
+    "CompanyMember",
+    "CompanyOwner",
+    "CreditDecision",
+    "CreditMemo",
+    "CreditProduct",
+    "Document",
+    "ExternalCheck",
+    "InfoRequest",
+    "Notification",
+    "PreApproval",
+    "ScoringResult",
+    "User",
+]
