@@ -12,6 +12,7 @@ from app.api.deps import (
     CurrentUnderwriter,
     Limit,
     Offset,
+    SessionDep,
     not_implemented,
 )
 from app.models.enums import ApplicationStatus, RiskZone
@@ -27,6 +28,8 @@ from app.schemas.decision import (
     DecisionRead,
     UnderwriterDecisionRequest,
 )
+from app.services import decisions
+from app.services.offers import to_decision_read
 
 router = APIRouter(
     prefix="/backoffice/applications", tags=["backoffice"], responses=AUTH_RESPONSES | NOT_FOUND
@@ -65,20 +68,28 @@ async def assign(
 
 @router.post("/{application_id}/analyst-conclusion", responses=CONFLICT)
 async def complete_analysis(
-    application_id: uuid.UUID, body: AnalystConclusionRequest, analyst: CurrentAnalyst
+    application_id: uuid.UUID,
+    body: AnalystConclusionRequest,
+    analyst: CurrentAnalyst,
+    session: SessionDep,
 ) -> CreditMemoRead:
     """Заключение кредитного аналитика дописывается в AI Credit Memo (или обновляется
     по запросу андеррайтера): analyst_escalation -> analyst_completed -> underwriter_review."""
-    not_implemented()
+    memo = await decisions.complete_analysis(session, analyst, application_id, body)
+    return CreditMemoRead.model_validate(memo)
 
 
 @router.post("/{application_id}/decision", status_code=status.HTTP_201_CREATED, responses=CONFLICT)
 async def make_decision(
-    application_id: uuid.UUID, body: UnderwriterDecisionRequest, underwriter: CurrentUnderwriter
+    application_id: uuid.UUID,
+    body: UnderwriterDecisionRequest,
+    underwriter: CurrentUnderwriter,
+    session: SessionDep,
 ) -> DecisionRead:
     """Финальное решение андеррайтера по AI Credit Memo и/или заключению аналитика:
     approved / conditional_approval (контр-предложение) -> offer_generated,
     more_information_required + client -> need_additional_data (дозапрос формирует ИИ),
     more_information_required + credit_analyst -> analyst_escalation,
     declined -> closed."""
-    not_implemented()
+    decision = await decisions.make_decision(session, underwriter, application_id, body)
+    return to_decision_read(decision)

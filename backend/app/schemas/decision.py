@@ -119,6 +119,7 @@ class CreditMemoRead(ORMModel):
     recommended_rate: Decimal | None
     recommended_conditions: list[OfferCondition]
     counter_offer_adjustments: list[CounterOfferAdjustment]
+    analyst_recommendation: AiRecommendation | None
     analyst_id: uuid.UUID | None
     analyst_conclusion: str | None
     analyst_completed_at: datetime | None
