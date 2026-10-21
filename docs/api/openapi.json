@@ -850,7 +850,7 @@
           "applications"
         ],
         "summary": "Update Application",
-        "description": "Изменить черновик или дополнить данные по дозапросу.",
+        "description": "Изменить черновик или дополнить данные по дозапросу.\nСумма, срок, цель и продукт меняются только до подачи (draft, pre_approved),\nфинансовые показатели и залог - ещё и в need_additional_data.",
         "operationId": "update_application_api_v1_applications__application_id__patch",
         "security": [
           {
@@ -949,7 +949,7 @@
           "applications"
         ],
         "summary": "Give Consents",
-        "description": "Дать согласия на получение данных (БКИ, ФНС, цифровой профиль).\ndraft -> data_collection: ИИ собирает данные и рассчитывает предварительный лимит.",
+        "description": "Дать согласия на получение данных (БКИ, ФНС, цифровой профиль), нужны все три.\ndraft -> data_collection: ИИ собирает данные и рассчитывает предварительный лимит.",
         "operationId": "give_consents_api_v1_applications__application_id__consents_post",
         "security": [
           {
@@ -2091,7 +2091,7 @@
           "applications"
         ],
         "summary": "Accept Offer",
-        "description": "offer_generated -> offer_accepted; далее система готовит документы на подпись.",
+        "description": "offer_generated -> offer_accepted -> contract_generation -> e_sign:\nподготовка договора смоделирована и происходит сразу.",
         "operationId": "accept_offer_api_v1_applications__application_id__offer_accept_post",
         "security": [
           {
@@ -2279,7 +2279,7 @@
           "applications"
         ],
         "summary": "Sign Agreement",
-        "description": "Смоделированное электронное подписание: e_sign -> disbursement -> completed.",
+        "description": "Смоделированное электронное подписание: e_sign -> disbursement -> completed.\nКод подтверждения не сверяется - в симуляции он показывается в интерфейсе.",
         "operationId": "sign_agreement_api_v1_applications__application_id__sign_post",
         "security": [
           {
@@ -4764,6 +4764,16 @@
             "type": "array",
             "title": "Counter Offer Adjustments"
           },
+          "analyst_recommendation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AiRecommendation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "analyst_id": {
             "anyOf": [
               {
@@ -4816,6 +4826,7 @@
           "recommended_rate",
           "recommended_conditions",
           "counter_offer_adjustments",
+          "analyst_recommendation",
           "analyst_id",
           "analyst_conclusion",
           "analyst_completed_at",

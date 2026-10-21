@@ -42,3 +42,11 @@ uv run pytest
 uv run ruff check .
 uv run uvicorn app.main:app --reload
 ```
+
+Тесты API работают с отдельной базой Postgres: схема накатывается миграциями, каждый тест откатывается. Без `TEST_DATABASE_URL` эти тесты пропускаются.
+
+```bash
+docker run -d --rm --name sco-pg-test -e POSTGRES_USER=credit -e POSTGRES_PASSWORD=credit \
+  -e POSTGRES_DB=credit_test -p 55432:5432 postgres:16-alpine
+TEST_DATABASE_URL=postgresql+asyncpg://credit:credit@localhost:55432/credit_test uv run pytest
+```

@@ -125,6 +125,7 @@ erDiagram
         numeric recommended_amount
         jsonb recommended_conditions
         jsonb counter_offer_adjustments
+        string analyst_recommendation
         uuid analyst_id FK
         text analyst_conclusion
     }
@@ -155,6 +156,8 @@ erDiagram
 | DSCR, Debt Burden, LTV, зона и confidence — отдельные колонки | По ним работает маршрутизация и фильтрация очереди бэкофиса; остальные метрики — в `metrics` (JSONB) |
 | `stop_factors`, `escalation_reasons`, `factors` в JSONB | Объяснимость: андеррайтер видит, почему заявка ушла к аналитику или в автоотказ и что повлияло на оценку |
 | `credit_memos.counter_offer_adjustments` | Контр-предложение ИИ по сценариям политики (лимит, срок, Debt Burden, LTV, риск-надбавка): что и почему изменилось относительно запроса |
+| `credit_memos.analyst_recommendation` отдельно от `ai_recommendation` | Андеррайтер видит и вывод ИИ, и вывод аналитика; скорректированные аналитиком условия пишутся в `recommended_*` |
+| `created_at` / `updated_at` ставятся в Python (`server_default` — запасной) | Значение доступно сразу после flush без повторного запроса (в async ленивая загрузка невозможна); переходы одной транзакции упорядочены в истории |
 | `credit_decisions.more_info_target` | У «нужны данные» два возвратных маршрута: документы от клиента или экспертиза аналитика |
 | `applications.close_reason` — enum | Четыре пути к финалу «Закрыто без выдачи» с доски; клиенту показывается причина |
 | `collateral_address`, `collateral_encumbrances`, `pre_approvals.collateral_required` | Консультация с залогом уточняет адрес и обременения; предварительный расчёт показывает необходимость обеспечения |

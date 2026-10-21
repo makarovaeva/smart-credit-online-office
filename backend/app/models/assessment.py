@@ -88,7 +88,11 @@ class CreditMemo(UUIDPkMixin, CreatedAtMixin, Base):
     # Чем контр-предложение отличается от запроса:
     # [{"scenario": "term_extension", "field": "term_months", "old_value": 24, "new_value": 36}]
     counter_offer_adjustments: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
-    # Заполняется на этапе analyst_escalation
+    # Заполняется на этапе analyst_escalation. Рекомендация ИИ остаётся в ai_recommendation,
+    # условия recommended_* аналитик может скорректировать
+    analyst_recommendation: Mapped[AiRecommendation | None] = mapped_column(
+        str_enum(AiRecommendation, name="analyst_recommendation")
+    )
     analyst_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
     analyst_conclusion: Mapped[str | None] = mapped_column(Text)
     analyst_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
