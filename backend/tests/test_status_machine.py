@@ -46,8 +46,22 @@ def test_only_underwriter_decides() -> None:
         assert not can_transition(S.UNDERWRITER_REVIEW, S.CLOSED, actor)
 
 
-def test_routing_has_no_auto_decline() -> None:
-    assert not can_transition(S.DECISION_ROUTING, S.CLOSED, A.SYSTEM)
+def test_auto_decline_only_on_routing() -> None:
+    assert can_transition(S.DECISION_ROUTING, S.CLOSED, A.SYSTEM)
+    for status in (S.AI_VERIFICATION, S.AI_FINANCIAL_ANALYSIS, S.AI_RISK_SCORING):
+        assert not can_transition(status, S.CLOSED, A.SYSTEM)
+
+
+def test_documents_return_to_verification_or_underwriter() -> None:
+    ensure_transition(S.NEED_ADDITIONAL_DATA, S.AI_VERIFICATION, A.CLIENT)
+    ensure_transition(S.NEED_ADDITIONAL_DATA, S.UNDERWRITER_REVIEW, A.CLIENT)
+    assert not can_transition(S.NEED_ADDITIONAL_DATA, S.AI_FINANCIAL_ANALYSIS, A.CLIENT)
+
+
+def test_underwriter_requests_analyst_expertise() -> None:
+    ensure_transition(S.UNDERWRITER_REVIEW, S.ANALYST_ESCALATION, A.UNDERWRITER)
+    ensure_transition(S.ANALYST_ESCALATION, S.ANALYST_COMPLETED, A.CREDIT_ANALYST)
+    ensure_transition(S.ANALYST_COMPLETED, S.UNDERWRITER_REVIEW, A.SYSTEM)
 
 
 def test_unknown_transition_raises() -> None:

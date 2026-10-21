@@ -11,6 +11,7 @@ from app.db.base import Base
 from app.models.enums import (
     ActorType,
     ApplicationStatus,
+    CloseReason,
     CollateralType,
     ConsentType,
     LoanPurpose,
@@ -53,15 +54,17 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     has_collateral: Mapped[bool] = mapped_column(default=False)
     collateral_type: Mapped[CollateralType | None] = mapped_column(str_enum(CollateralType))
     collateral_description: Mapped[str | None] = mapped_column(Text)
+    collateral_address: Mapped[str | None] = mapped_column(Text)
     collateral_market_value: Mapped[Decimal | None] = mapped_column(Money)
+    # Обременения со слов клиента: залог у другого банка, арест и т.п.
+    collateral_encumbrances: Mapped[str | None] = mapped_column(Text)
 
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     signed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     disbursed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    # Почему заявка закрыта без выдачи: отказ банка, отказ клиента, fraud
-    close_reason: Mapped[str | None] = mapped_column(String(50))
+    close_reason: Mapped[CloseReason | None] = mapped_column(str_enum(CloseReason))
 
     # Оптимистичная блокировка: клиент и сотрудники банка не перетрут изменения друг друга
     version: Mapped[int] = mapped_column(default=1)
@@ -93,6 +96,7 @@ class PreApproval(UUIDPkMixin, CreatedAtMixin, Base):
     amount_min: Mapped[Decimal] = mapped_column(Money)
     amount_max: Mapped[Decimal] = mapped_column(Money)
     estimated_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2))
+    collateral_required: Mapped[bool] = mapped_column(default=False)
     # [{"code": "...", "message": "Предоставьте обеспечение, чтобы увеличить сумму"}]
     recommendations: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
 

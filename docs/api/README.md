@@ -20,6 +20,7 @@ cd backend && uv run python -m scripts.export_openapi
 - Списки — `limit`/`offset`, ответ `{items, total, limit, offset}`.
 - Смена статуса — отдельными командами (`/consents`, `/submit`, `/offer/accept`, ...), а не `PATCH status`: так каждое действие валидируется машиной состояний и попадает в аудит. Статусы описаны в [`../application-lifecycle.md`](../application-lifecycle.md).
 - `ApplicationRead.available_actions` — что клиенту можно сделать сейчас; фронт не дублирует логику статусов.
+- `ApplicationRead.client_status` — статус глазами клиента («Заявка создана», «Идет рассмотрение», «Контр-предложение», ...); внутренние этапы банка клиенту не показываются.
 
 ## Эндпоинты
 
@@ -42,8 +43,8 @@ cd backend && uv run python -m scripts.export_openapi
 | GET | `/applications/{id}/history` | Таймлайн статусов |
 | POST/GET/DELETE | `/applications/{id}/documents[...]` | Документы |
 | GET | `/applications/{id}/info-requests` | Дозапросы (от ИИ или андеррайтера) |
-| POST | `/applications/{id}/info-requests/{rid}/answer` | Ответить: `need_additional_data → ai_financial_analysis` |
-| GET | `/applications/{id}/offer` | Оффер |
+| POST | `/applications/{id}/info-requests/{rid}/answer` | Ответить: `need_additional_data → ai_verification` (дозапрос ИИ) или `→ underwriter_review` (дозапрос андеррайтера) |
+| GET | `/applications/{id}/offer` | Оффер или контр-предложение (`decision_type=conditional_approval`) |
 | POST | `/applications/{id}/offer/accept`, `/reject` | Принять / отказаться от оффера |
 | POST | `/applications/{id}/sign` | Подписание (симуляция): `e_sign → disbursement → completed` |
 | GET | `/notifications`, POST `/notifications/{id}/read` | Уведомления в кабинете |
@@ -56,17 +57,15 @@ cd backend && uv run python -m scripts.export_openapi
 | GET | `/backoffice/applications/{id}` | аналитик, андеррайтер | Карточка: компания, учредители, проверки, метрики, скоринг, AI Credit Memo, решения, история |
 | POST | `/backoffice/applications/{id}/assign` | аналитик, андеррайтер | Назначить исполнителя |
 | POST | `/backoffice/applications/{id}/analyst-conclusion` | аналитик | Заключение: `analyst_escalation → analyst_completed → underwriter_review` |
-| POST | `/backoffice/applications/{id}/decision` | андеррайтер | Одно из 4 решений; `more_information_required` создаёт дозапрос |
+| POST | `/backoffice/applications/{id}/decision` | андеррайтер | Одно из 4 решений; `more_information_required` с `more_info_target`: `client` — дозапрос документов, `credit_analyst` — запрос экспертизы |
 
-Этапы `data_collection`, `ai_*`, `decision_routing`, `contract_generation`, `disbursement` двигает конвейер, публичных эндпоинтов для них нет. Внешние источники (ЕГРЮЛ, ФНС, БКИ, ФССП, обороты РКО, цифровой профиль) — внутренние модули-моки в `app/integrations/`.
+Этапы `data_collection`, `ai_*`, `decision_routing` (включая автоотказ по стоп-фактору), `contract_generation`, `disbursement` двигает конвейер, публичных эндпоинтов для них нет. Внешние источники (ЕГРЮЛ, ФНС, БКИ, ФССП, обороты РКО, цифровой профиль) — внутренние модули-моки в `app/integrations/`.
 
 ## Открытые вопросы
 
 Пороги, не заданные в кредитной политике на доске:
 
 1. Числовой порог кредитного рейтинга.
-2. Допустимая долговая нагрузка и минимальный DSCR после выдачи.
-3. Лимит исполнительных производств.
-4. `FRAUD_SCORE threshold`.
-5. Приоритет пересекающихся правил.
-6. Срок действия оффера (`valid_until`).
+2. Лимит исполнительных производств.
+3. Срок действия оффера (`valid_until`).
+4. Расхождения на доске, по которым принято решение (см. [`../application-lifecycle.md`](../application-lifecycle.md#допущения-и-неопределённости)): лимит автоодобрения «ИЛИ» против «меньшая из величин», минимальный DSCR 1,1 против 1,2, Debt Burden = 1 / DSCR.

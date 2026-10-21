@@ -6,7 +6,14 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field
 
-from app.models.enums import ActorType, ApplicationStatus, CollateralType, ConsentType, LoanPurpose
+from app.models.enums import (
+    ActorType,
+    ApplicationStatus,
+    CloseReason,
+    CollateralType,
+    ConsentType,
+    LoanPurpose,
+)
 from app.schemas.common import MoneyAmount, ORMModel, TermMonths
 
 OptionalMoney = Annotated[Decimal | None, Field(ge=0, max_digits=15, decimal_places=2)]
@@ -28,6 +35,20 @@ class ApplicationAction(StrEnum):
     SIGN = "sign"
 
 
+class ClientStatus(StrEnum):
+    """Статус, который видит клиент: внутренние этапы банка схлопнуты в «идёт рассмотрение»."""
+
+    DRAFT = "draft"
+    CREATED = "created"  # «Заявка создана»
+    UNDER_REVIEW = "under_review"  # «Идет рассмотрение заявки»
+    DOCUMENTS_REQUIRED = "documents_required"
+    APPROVED = "approved"  # «Одобрено»
+    COUNTER_OFFER = "counter_offer"  # «Контр-предложение»
+    SIGNED = "signed"  # «Подписано»
+    DISBURSED = "disbursed"  # «Средства зачислены»
+    CLOSED = "closed"  # «Закрыто»
+
+
 class ApplicationFinancials(BaseModel):
     annual_revenue: OptionalMoney = None
     annual_ebitda: SignedMoney = None
@@ -37,7 +58,9 @@ class ApplicationFinancials(BaseModel):
     has_collateral: bool = False
     collateral_type: CollateralType | None = None
     collateral_description: str | None = None
+    collateral_address: str | None = Field(default=None, max_length=1000)
     collateral_market_value: OptionalMoney = None
+    collateral_encumbrances: str | None = Field(default=None, max_length=2000)
 
 
 class ApplicationCreate(ApplicationFinancials):
@@ -65,7 +88,9 @@ class ApplicationUpdate(BaseModel):
     has_collateral: bool | None = None
     collateral_type: CollateralType | None = None
     collateral_description: str | None = None
+    collateral_address: str | None = Field(default=None, max_length=1000)
     collateral_market_value: OptionalMoney = None
+    collateral_encumbrances: str | None = Field(default=None, max_length=2000)
     version: int = Field(description="Текущая версия заявки для оптимистичной блокировки")
 
 
@@ -90,8 +115,9 @@ class ApplicationRead(ApplicationShort, ApplicationFinancials):
     signed_at: datetime | None
     disbursed_at: datetime | None
     closed_at: datetime | None
-    close_reason: str | None
+    close_reason: CloseReason | None
     version: int
+    client_status: ClientStatus
     status_description: str = Field(description="Понятное клиенту описание текущего этапа")
     available_actions: list[ApplicationAction]
 
@@ -126,6 +152,7 @@ class PreApprovalRead(ORMModel):
     amount_min: Decimal
     amount_max: Decimal
     estimated_rate: Decimal
+    collateral_required: bool
     recommendations: list[PreApprovalRecommendation]
     created_at: datetime
 

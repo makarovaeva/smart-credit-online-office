@@ -1128,7 +1128,7 @@
           "applications"
         ],
         "summary": "Get Pre Approval",
-        "description": "Вероятность одобрения, диапазон суммы, прогнозируемая ставка и рекомендации.",
+        "description": "Вероятность одобрения, диапазон суммы, прогнозируемая ставка,\nнеобходимость обеспечения и рекомендации.",
         "operationId": "get_pre_approval_api_v1_applications__application_id__pre_approval_get",
         "security": [
           {
@@ -1207,7 +1207,7 @@
           "applications"
         ],
         "summary": "Decline Pre Approval",
-        "description": "Клиент не продолжает после предварительного расчёта: pre_approved -> closed.",
+        "description": "Клиент не продолжает после предварительного расчёта: pre_approved -> closed\n(close_reason = pre_approval_declined).",
         "operationId": "decline_pre_approval_api_v1_applications__application_id__pre_approval_decline_post",
         "security": [
           {
@@ -1903,7 +1903,7 @@
           "applications"
         ],
         "summary": "Answer Info Request",
-        "description": "Ответить на дозапрос. Когда закрыты все открытые дозапросы:\nneed_additional_data -> ai_financial_analysis.",
+        "description": "Ответить на дозапрос. Когда закрыты все открытые дозапросы:\nдозапрос ИИ - need_additional_data -> ai_verification (повторная проверка комплекта),\nдозапрос андеррайтера - need_additional_data -> underwriter_review.",
         "operationId": "answer_info_request_api_v1_applications__application_id__info_requests__info_request_id__answer_post",
         "security": [
           {
@@ -2012,7 +2012,7 @@
           "applications"
         ],
         "summary": "Get Offer",
-        "description": "Оффер: сумма, ставка, срок, условия и причины решения.",
+        "description": "Оффер: сумма, ставка, срок, условия и причины решения.\ndecision_type = conditional_approval - контр-предложение на изменённых условиях.",
         "operationId": "get_offer_api_v1_applications__application_id__offer_get",
         "security": [
           {
@@ -2180,7 +2180,7 @@
           "applications"
         ],
         "summary": "Reject Offer",
-        "description": "offer_generated -> offer_rejected -> closed.",
+        "description": "offer_generated -> offer_rejected -> closed (close_reason = offer_rejected).",
         "operationId": "reject_offer_api_v1_applications__application_id__offer_reject_post",
         "security": [
           {
@@ -2540,7 +2540,7 @@
           "backoffice"
         ],
         "summary": "List Applications",
-        "description": "Очередь заявок, старые первыми. Аналитику по умолчанию - analyst_escalation,\nандеррайтеру - underwriter_review.",
+        "description": "Очередь заявок, старые первыми. Аналитику по умолчанию - analyst_escalation\n(жёлтая зона и запросы экспертизы от андеррайтера), андеррайтеру - underwriter_review.",
         "operationId": "list_applications_api_v1_backoffice_applications_get",
         "security": [
           {
@@ -2871,7 +2871,7 @@
           "backoffice"
         ],
         "summary": "Complete Analysis",
-        "description": "Заключение кредитного аналитика дописывается в AI Credit Memo:\nanalyst_escalation -> analyst_completed -> underwriter_review.",
+        "description": "Заключение кредитного аналитика дописывается в AI Credit Memo (или обновляется\nпо запросу андеррайтера): analyst_escalation -> analyst_completed -> underwriter_review.",
         "operationId": "complete_analysis_api_v1_backoffice_applications__application_id__analyst_conclusion_post",
         "security": [
           {
@@ -2970,7 +2970,7 @@
           "backoffice"
         ],
         "summary": "Make Decision",
-        "description": "Финальное решение андеррайтера по AI Credit Memo:\napproved / conditional_approval -> offer_generated,\nmore_information_required -> need_additional_data,\ndeclined -> closed.",
+        "description": "Финальное решение андеррайтера по AI Credit Memo и/или заключению аналитика:\napproved / conditional_approval (контр-предложение) -> offer_generated,\nmore_information_required + client -> need_additional_data (дозапрос формирует ИИ),\nmore_information_required + credit_analyst -> analyst_escalation,\ndeclined -> closed.",
         "operationId": "make_decision_api_v1_backoffice_applications__application_id__decision_post",
         "security": [
           {
@@ -3285,6 +3285,18 @@
             ],
             "title": "Collateral Description"
           },
+          "collateral_address": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collateral Address"
+          },
           "collateral_market_value": {
             "anyOf": [
               {
@@ -3299,6 +3311,18 @@
               }
             ],
             "title": "Collateral Market Value"
+          },
+          "collateral_encumbrances": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collateral Encumbrances"
           },
           "company_id": {
             "type": "string",
@@ -3443,6 +3467,18 @@
             ],
             "title": "Collateral Description"
           },
+          "collateral_address": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collateral Address"
+          },
           "collateral_market_value": {
             "anyOf": [
               {
@@ -3453,6 +3489,18 @@
               }
             ],
             "title": "Collateral Market Value"
+          },
+          "collateral_encumbrances": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collateral Encumbrances"
           },
           "id": {
             "type": "string",
@@ -3576,17 +3624,19 @@
           "close_reason": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/CloseReason"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Close Reason"
+            ]
           },
           "version": {
             "type": "integer",
             "title": "Version"
+          },
+          "client_status": {
+            "$ref": "#/components/schemas/ClientStatus"
           },
           "status_description": {
             "type": "string",
@@ -3622,6 +3672,7 @@
           "closed_at",
           "close_reason",
           "version",
+          "client_status",
           "status_description",
           "available_actions"
         ],
@@ -3890,6 +3941,18 @@
             ],
             "title": "Collateral Description"
           },
+          "collateral_address": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collateral Address"
+          },
           "collateral_market_value": {
             "anyOf": [
               {
@@ -3904,6 +3967,18 @@
               }
             ],
             "title": "Collateral Market Value"
+          },
+          "collateral_encumbrances": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collateral Encumbrances"
           },
           "version": {
             "type": "integer",
@@ -4203,6 +4278,33 @@
           "failed"
         ],
         "title": "CheckStatus"
+      },
+      "ClientStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "created",
+          "under_review",
+          "documents_required",
+          "approved",
+          "counter_offer",
+          "signed",
+          "disbursed",
+          "closed"
+        ],
+        "title": "ClientStatus",
+        "description": "Статус, который видит клиент: внутренние этапы банка схлопнуты в «идёт рассмотрение»."
+      },
+      "CloseReason": {
+        "type": "string",
+        "enum": [
+          "pre_approval_declined",
+          "auto_declined",
+          "underwriter_declined",
+          "offer_rejected"
+        ],
+        "title": "CloseReason",
+        "description": "Четыре пути к финалу «Закрыто без выдачи»."
       },
       "CollateralType": {
         "type": "string",
@@ -4534,6 +4636,58 @@
         "title": "ConsentsRequest",
         "description": "Согласия на получение данных: переводит черновик в сбор данных."
       },
+      "CounterOfferAdjustment": {
+        "properties": {
+          "scenario": {
+            "$ref": "#/components/schemas/CounterOfferScenario"
+          },
+          "field": {
+            "type": "string",
+            "title": "Field",
+            "description": "amount | term_months | rate",
+            "examples": [
+              "term_months"
+            ]
+          },
+          "old_value": {
+            "type": "string",
+            "title": "Old Value"
+          },
+          "new_value": {
+            "type": "string",
+            "title": "New Value"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "examples": [
+              "Срок увеличен, платёж пересчитан: DSCR ≥ 1.1"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario",
+          "field",
+          "old_value",
+          "new_value",
+          "description"
+        ],
+        "title": "CounterOfferAdjustment",
+        "description": "Изменение условий относительно запроса клиента по одному из сценариев политики."
+      },
+      "CounterOfferScenario": {
+        "type": "string",
+        "enum": [
+          "auto_approval_limit",
+          "term_extension",
+          "debt_burden_amount_reduction",
+          "ltv_amount_reduction",
+          "risk_premium"
+        ],
+        "title": "CounterOfferScenario",
+        "description": "Сценарии контр-предложения ИИ из кредитной политики."
+      },
       "CreditFormat": {
         "type": "string",
         "enum": [
@@ -4603,6 +4757,13 @@
             "type": "array",
             "title": "Recommended Conditions"
           },
+          "counter_offer_adjustments": {
+            "items": {
+              "$ref": "#/components/schemas/CounterOfferAdjustment"
+            },
+            "type": "array",
+            "title": "Counter Offer Adjustments"
+          },
           "analyst_id": {
             "anyOf": [
               {
@@ -4654,6 +4815,7 @@
           "recommended_term_months",
           "recommended_rate",
           "recommended_conditions",
+          "counter_offer_adjustments",
           "analyst_id",
           "analyst_conclusion",
           "analyst_completed_at",
@@ -4815,6 +4977,16 @@
             "format": "uuid",
             "title": "Decided By Id"
           },
+          "more_info_target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MoreInfoTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "comment": {
             "anyOf": [
               {
@@ -4854,6 +5026,7 @@
           "created_at",
           "credit_memo_id",
           "decided_by_id",
+          "more_info_target",
           "comment",
           "client_responded_at"
         ],
@@ -4962,7 +5135,10 @@
           "financial_statement",
           "management_report",
           "contract",
-          "collateral",
+          "egrn_extract",
+          "vehicle_passport",
+          "equipment_documents",
+          "appraisal_report",
           "credit_agreement",
           "other"
         ],
@@ -4987,11 +5163,7 @@
       "EscalationReason": {
         "properties": {
           "code": {
-            "type": "string",
-            "title": "Code",
-            "examples": [
-              "low_confidence"
-            ]
+            "$ref": "#/components/schemas/EscalationReasonCode"
           },
           "description": {
             "type": "string",
@@ -5007,6 +5179,20 @@
           "description"
         ],
         "title": "EscalationReason"
+      },
+      "EscalationReasonCode": {
+        "type": "string",
+        "enum": [
+          "low_confidence",
+          "young_business",
+          "conflicting_data",
+          "high_ltv",
+          "weak_credit_history",
+          "severe_revenue_drop",
+          "no_counter_offer"
+        ],
+        "title": "EscalationReasonCode",
+        "description": "Основания передачи кредитному аналитику (жёлтая зона)."
       },
       "ExternalCheckRead": {
         "properties": {
@@ -5243,6 +5429,15 @@
           "password"
         ],
         "title": "LoginRequest"
+      },
+      "MoreInfoTarget": {
+        "type": "string",
+        "enum": [
+          "client",
+          "credit_analyst"
+        ],
+        "title": "MoreInfoTarget",
+        "description": "Кому андеррайтер адресует more_information_required."
       },
       "NotificationRead": {
         "properties": {
@@ -5562,6 +5757,10 @@
             "type": "string",
             "title": "Estimated Rate"
           },
+          "collateral_required": {
+            "type": "boolean",
+            "title": "Collateral Required"
+          },
           "recommendations": {
             "items": {
               "$ref": "#/components/schemas/PreApprovalRecommendation"
@@ -5581,6 +5780,7 @@
           "amount_min",
           "amount_max",
           "estimated_rate",
+          "collateral_required",
           "recommendations",
           "created_at"
         ],
@@ -5807,7 +6007,7 @@
           "red"
         ],
         "title": "RiskZone",
-        "description": "Зелёная - к андеррайтеру, жёлтая и красная - к кредитному аналитику."
+        "description": "Зелёная - к андеррайтеру, жёлтая - к кредитному аналитику, красная - автоотказ."
       },
       "ScoringFactor": {
         "properties": {
@@ -6024,23 +6224,17 @@
       "StopFactor": {
         "properties": {
           "code": {
-            "type": "string",
-            "title": "Code",
-            "examples": [
-              "account_blocked_115fz"
-            ]
+            "$ref": "#/components/schemas/StopFactorCode"
           },
           "category": {
-            "type": "string",
-            "title": "Category",
-            "description": "legal | financial | fictitious | fraud",
-            "examples": [
-              "legal"
-            ]
+            "$ref": "#/components/schemas/StopFactorCategory"
           },
           "description": {
             "type": "string",
-            "title": "Description"
+            "title": "Description",
+            "examples": [
+              "Счета заблокированы по 115-ФЗ"
+            ]
           }
         },
         "type": "object",
@@ -6050,6 +6244,32 @@
           "description"
         ],
         "title": "StopFactor"
+      },
+      "StopFactorCategory": {
+        "type": "string",
+        "enum": [
+          "legal",
+          "financial",
+          "fictitious"
+        ],
+        "title": "StopFactorCategory"
+      },
+      "StopFactorCode": {
+        "type": "string",
+        "enum": [
+          "bankruptcy",
+          "accounts_blocked_115fz",
+          "sanctioned_owner",
+          "prohibited_activity",
+          "negative_cash_flow",
+          "low_dscr",
+          "mass_address",
+          "mass_director",
+          "no_employees",
+          "no_tax_activity"
+        ],
+        "title": "StopFactorCode",
+        "description": "Стоп-факторы кредитной политики: любой из них - автоотказ."
       },
       "TokenResponse": {
         "properties": {
@@ -6149,6 +6369,16 @@
             "title": "Reasons",
             "default": []
           },
+          "more_info_target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MoreInfoTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "info_request": {
             "anyOf": [
               {
@@ -6177,7 +6407,7 @@
           "decision_type"
         ],
         "title": "UnderwriterDecisionRequest",
-        "description": "approved/conditional_approval требуют условий оффера,\nmore_information_required - дозапроса клиенту."
+        "description": "approved/conditional_approval требуют условий оффера.\nconditional_approval - контр-предложение: изменены сумма, срок, ставка или обеспечение.\nmore_information_required требует more_info_target: client - с info_request (запрос\nдокументов формирует ИИ-агент), credit_analyst - с comment (что проверить аналитику)."
       },
       "UserCompany": {
         "properties": {

@@ -9,10 +9,15 @@ from app.models.enums import (
     AiRecommendation,
     CheckSource,
     CheckStatus,
+    CounterOfferScenario,
     DecisionType,
+    EscalationReasonCode,
+    MoreInfoTarget,
     OfferResponse,
     RiskGrade,
     RiskZone,
+    StopFactorCategory,
+    StopFactorCode,
 )
 from app.schemas.common import MoneyAmount, ORMModel, TermMonths
 from app.schemas.document import InfoRequestCreate
@@ -66,14 +71,24 @@ class ScoringFactor(BaseModel):
 
 
 class StopFactor(BaseModel):
-    code: str = Field(examples=["account_blocked_115fz"])
-    category: str = Field(examples=["legal"], description="legal | financial | fictitious | fraud")
-    description: str
+    code: StopFactorCode
+    category: StopFactorCategory
+    description: str = Field(examples=["Счета заблокированы по 115-ФЗ"])
 
 
 class EscalationReason(BaseModel):
-    code: str = Field(examples=["low_confidence"])
+    code: EscalationReasonCode
     description: str = Field(examples=["Уверенность модели ниже 80%"])
+
+
+class CounterOfferAdjustment(BaseModel):
+    """Изменение условий относительно запроса клиента по одному из сценариев политики."""
+
+    scenario: CounterOfferScenario
+    field: str = Field(examples=["term_months"], description="amount | term_months | rate")
+    old_value: Decimal
+    new_value: Decimal
+    description: str = Field(examples=["Срок увеличен, платёж пересчитан: DSCR ≥ 1.1"])
 
 
 class ScoringResultRead(ORMModel):
@@ -103,6 +118,7 @@ class CreditMemoRead(ORMModel):
     recommended_term_months: int | None
     recommended_rate: Decimal | None
     recommended_conditions: list[OfferCondition]
+    counter_offer_adjustments: list[CounterOfferAdjustment]
     analyst_id: uuid.UUID | None
     analyst_conclusion: str | None
     analyst_completed_at: datetime | None
@@ -125,13 +141,16 @@ class DecisionRead(OfferRead):
 
     credit_memo_id: uuid.UUID
     decided_by_id: uuid.UUID
+    more_info_target: MoreInfoTarget | None
     comment: str | None
     client_responded_at: datetime | None
 
 
 class UnderwriterDecisionRequest(BaseModel):
-    """approved/conditional_approval требуют условий оффера,
-    more_information_required - дозапроса клиенту."""
+    """approved/conditional_approval требуют условий оффера.
+    conditional_approval - контр-предложение: изменены сумма, срок, ставка или обеспечение.
+    more_information_required требует more_info_target: client - с info_request (запрос
+    документов формирует ИИ-агент), credit_analyst - с comment (что проверить аналитику)."""
 
     decision_type: DecisionType
     approved_amount: MoneyAmount | None = None
@@ -139,5 +158,6 @@ class UnderwriterDecisionRequest(BaseModel):
     interest_rate: Decimal | None = Field(default=None, gt=0, le=100, decimal_places=2)
     conditions: list[OfferCondition] = []
     reasons: list[DecisionReason] = []
+    more_info_target: MoreInfoTarget | None = None
     info_request: InfoRequestCreate | None = None
     comment: str | None = Field(default=None, max_length=2000)

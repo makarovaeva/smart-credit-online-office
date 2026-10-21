@@ -92,7 +92,11 @@ class DocumentType(StrEnum):
     FINANCIAL_STATEMENT = "financial_statement"
     MANAGEMENT_REPORT = "management_report"
     CONTRACT = "contract"
-    COLLATERAL = "collateral"
+    # Залоговые документы - только для ветки с залогом
+    EGRN_EXTRACT = "egrn_extract"
+    VEHICLE_PASSPORT = "vehicle_passport"
+    EQUIPMENT_DOCUMENTS = "equipment_documents"
+    APPRAISAL_REPORT = "appraisal_report"
     CREDIT_AGREEMENT = "credit_agreement"
     OTHER = "other"
 
@@ -127,7 +131,7 @@ class RiskGrade(StrEnum):
 
 
 class RiskZone(StrEnum):
-    """Зелёная - к андеррайтеру, жёлтая и красная - к кредитному аналитику."""
+    """Зелёная - к андеррайтеру, жёлтая - к кредитному аналитику, красная - автоотказ."""
 
     GREEN = "green"
     YELLOW = "yellow"
@@ -150,6 +154,71 @@ class DecisionType(StrEnum):
     MORE_INFORMATION_REQUIRED = "more_information_required"
 
 
+class MoreInfoTarget(StrEnum):
+    """Кому андеррайтер адресует more_information_required."""
+
+    # Документы у клиента: дозапрос формирует ИИ-агент
+    CLIENT = "client"
+    # Дополнительная экспертиза и обновление заключения
+    CREDIT_ANALYST = "credit_analyst"
+
+
 class OfferResponse(StrEnum):
     ACCEPTED = "accepted"
     REJECTED = "rejected"
+
+
+class CloseReason(StrEnum):
+    """Четыре пути к финалу «Закрыто без выдачи»."""
+
+    PRE_APPROVAL_DECLINED = "pre_approval_declined"
+    AUTO_DECLINED = "auto_declined"
+    UNDERWRITER_DECLINED = "underwriter_declined"
+    OFFER_REJECTED = "offer_rejected"
+
+
+class StopFactorCode(StrEnum):
+    """Стоп-факторы кредитной политики: любой из них - автоотказ."""
+
+    # Юридические
+    BANKRUPTCY = "bankruptcy"
+    ACCOUNTS_BLOCKED_115FZ = "accounts_blocked_115fz"
+    SANCTIONED_OWNER = "sanctioned_owner"
+    PROHIBITED_ACTIVITY = "prohibited_activity"
+    # Финансовые
+    NEGATIVE_CASH_FLOW = "negative_cash_flow"
+    LOW_DSCR = "low_dscr"
+    # Признаки фиктивного бизнеса
+    MASS_ADDRESS = "mass_address"
+    MASS_DIRECTOR = "mass_director"
+    NO_EMPLOYEES = "no_employees"
+    NO_TAX_ACTIVITY = "no_tax_activity"
+
+
+class StopFactorCategory(StrEnum):
+    LEGAL = "legal"
+    FINANCIAL = "financial"
+    FICTITIOUS = "fictitious"
+
+
+class EscalationReasonCode(StrEnum):
+    """Основания передачи кредитному аналитику (жёлтая зона)."""
+
+    LOW_CONFIDENCE = "low_confidence"
+    YOUNG_BUSINESS = "young_business"
+    CONFLICTING_DATA = "conflicting_data"
+    HIGH_LTV = "high_ltv"
+    WEAK_CREDIT_HISTORY = "weak_credit_history"
+    # Допущения: на доске эти случаи не описаны
+    SEVERE_REVENUE_DROP = "severe_revenue_drop"
+    NO_COUNTER_OFFER = "no_counter_offer"
+
+
+class CounterOfferScenario(StrEnum):
+    """Сценарии контр-предложения ИИ из кредитной политики."""
+
+    AUTO_APPROVAL_LIMIT = "auto_approval_limit"
+    TERM_EXTENSION = "term_extension"
+    DEBT_BURDEN_AMOUNT_REDUCTION = "debt_burden_amount_reduction"
+    LTV_AMOUNT_REDUCTION = "ltv_amount_reduction"
+    RISK_PREMIUM = "risk_premium"
