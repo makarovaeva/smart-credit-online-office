@@ -8,7 +8,7 @@
 - очередь, карточка и назначение в бэкофисе;
 - `/notifications`.
 
-Этапы конвейера ИИ (`data_collection → pre_approved`, `submitted → … → decision_routing`) ещё не реализованы: заявка остаётся в `data_collection` или `submitted`.
+Этапы конвейера ИИ запускаются сразу после команд клиента. `/consents` возвращает заявку уже в `pre_approved`. `/submit` возвращает её в `underwriter_review`, `analyst_escalation`, `need_additional_data` или `closed` (автоотказ). Подробно — [`../application-lifecycle.md`](../application-lifecycle.md#кредитный-конвейер).
 
 Спека генерируется из кода (Pydantic-схемы + роутеры FastAPI). После изменения API:
 

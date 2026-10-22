@@ -202,12 +202,16 @@ def build_features(
             conflicts.append("Долг в отчётности расходится с данными БКИ")
 
     values["conflicting_data"] = bool(conflicts)
+    missing = [source for source in SOURCES if source not in results]
     return Features(
         signals=RiskSignals(
-            flags=frozenset(flags), conflicting_data=bool(conflicts), **signal_args
+            flags=frozenset(flags),
+            conflicting_data=bool(conflicts),
+            missing_data=bool(missing),
+            **signal_args,
         ),
         values=values,
         existing_annual_debt_service=debt_service,
-        missing_sources=[source for source in SOURCES if source not in results],
+        missing_sources=missing,
         conflicts=conflicts,
     )

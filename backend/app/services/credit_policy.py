@@ -89,6 +89,7 @@ ESCALATION_DESCRIPTIONS: dict[EscalationReasonCode, str] = {
     Escalation.WEAK_CREDIT_HISTORY: "Слабая кредитная история",
     Escalation.SEVERE_REVENUE_DROP: "Падение выручки более 30%",
     Escalation.NO_COUNTER_OFFER: "Контр-предложение не приводит показатели к зелёной зоне",
+    Escalation.MISSING_EXTERNAL_DATA: "Не ответил внешний источник данных",
 }
 
 
@@ -106,6 +107,8 @@ class RiskSignals:
     weak_credit_history: bool = False
     # Падение выручки, доля 0..1
     revenue_drop: Decimal = Decimal("0")
+    # Не ответил хотя бы один внешний источник: решение на неполных данных
+    missing_data: bool = False
 
 
 @dataclass(frozen=True)
@@ -255,6 +258,7 @@ def _escalation_reasons(
         Escalation.HIGH_LTV: metrics.ltv is not None and metrics.ltv >= t.max_ltv,
         Escalation.WEAK_CREDIT_HISTORY: s.weak_credit_history,
         Escalation.SEVERE_REVENUE_DROP: s.revenue_drop > t.revenue_drop_premium_to,
+        Escalation.MISSING_EXTERNAL_DATA: s.missing_data,
     }
     return [code for code, hit in checks.items() if hit]
 
