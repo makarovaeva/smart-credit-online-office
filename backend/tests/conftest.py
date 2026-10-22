@@ -75,9 +75,12 @@ def auth(user: User) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-async def _user(session: AsyncSession, email: str, role: UserRole) -> User:
+async def make_user(
+    session: AsyncSession, email: str, role: UserRole, phone: str | None = None
+) -> User:
     user = User(
         email=email,
+        phone=phone,
         full_name=email.split("@")[0],
         password_hash=PASSWORD_HASH,
         role=role,
@@ -109,22 +112,22 @@ async def make_company(session: AsyncSession, inn: str, owner: User) -> Company:
 
 @pytest.fixture
 async def client_user(session: AsyncSession) -> User:
-    return await _user(session, "client@example.com", UserRole.CLIENT)
+    return await make_user(session, "client@example.com", UserRole.CLIENT, "+79990000101")
 
 
 @pytest.fixture
 async def other_client(session: AsyncSession) -> User:
-    return await _user(session, "other@example.com", UserRole.CLIENT)
+    return await make_user(session, "other@example.com", UserRole.CLIENT, "+79990000102")
 
 
 @pytest.fixture
 async def analyst(session: AsyncSession) -> User:
-    return await _user(session, "analyst@example.com", UserRole.CREDIT_ANALYST)
+    return await make_user(session, "analyst@example.com", UserRole.CREDIT_ANALYST)
 
 
 @pytest.fixture
 async def underwriter(session: AsyncSession) -> User:
-    return await _user(session, "underwriter@example.com", UserRole.UNDERWRITER)
+    return await make_user(session, "underwriter@example.com", UserRole.UNDERWRITER)
 
 
 @pytest.fixture

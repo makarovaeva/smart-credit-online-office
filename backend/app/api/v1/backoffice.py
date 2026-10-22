@@ -13,7 +13,6 @@ from app.api.deps import (
     Limit,
     Offset,
     SessionDep,
-    not_implemented,
 )
 from app.models.enums import ApplicationStatus, RiskZone
 from app.schemas.backoffice import (
@@ -28,7 +27,7 @@ from app.schemas.decision import (
     DecisionRead,
     UnderwriterDecisionRequest,
 )
-from app.services import decisions
+from app.services import backoffice, decisions
 from app.services.offers import to_decision_read
 
 router = APIRouter(
@@ -39,31 +38,37 @@ router = APIRouter(
 @router.get("")
 async def list_applications(
     employee: CurrentEmployee,
+    session: SessionDep,
     status_in: Annotated[list[ApplicationStatus] | None, Query(alias="status")] = None,
     risk_zone: RiskZone | None = None,
-    assignee_id: uuid.UUID | None = None,
-    unassigned: bool = False,
     limit: Limit = 20,
     offset: Offset = 0,
 ) -> Page[BackofficeApplicationItem]:
-    """Очередь заявок, старые первыми. Аналитику по умолчанию - analyst_escalation
-    (жёлтая зона и запросы экспертизы от андеррайтера), андеррайтеру - underwriter_review."""
-    not_implemented()
+    """Свои заявки сотрудника, старые первыми: назначенные на него и те, с которыми он уже
+    работал. Заявка назначается автоматически: на analyst_escalation - аналитику,
+    на underwriter_review - андеррайтеру. Текущая очередь аналитика - status=analyst_escalation,
+    андеррайтера - status=underwriter_review. Администратор видит все заявки."""
+    items, total = await backoffice.list_queue(
+        session, employee, statuses=status_in, risk_zone=risk_zone, limit=limit, offset=offset
+    )
+    return Page(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.get("/{application_id}")
 async def get_application(
-    application_id: uuid.UUID, employee: CurrentEmployee
+    application_id: uuid.UUID, employee: CurrentEmployee, session: SessionDep
 ) -> BackofficeApplicationDetail:
-    """Карточка заявки: данные, проверки, метрики, скоринг, AI Credit Memo, история."""
-    not_implemented()
+    """Карточка своей заявки: данные, проверки, метрики, скоринг, AI Credit Memo, история."""
+    return await backoffice.get_detail(session, employee, application_id)
 
 
 @router.post("/{application_id}/assign", responses=CONFLICT)
 async def assign(
-    application_id: uuid.UUID, body: AssignRequest, employee: CurrentEmployee
+    application_id: uuid.UUID, body: AssignRequest, employee: CurrentEmployee, session: SessionDep
 ) -> BackofficeApplicationDetail:
-    not_implemented()
+    """Передать заявку другому сотруднику той же роли. Доступно сотруднику текущего этапа
+    и администратору."""
+    return await backoffice.reassign(session, employee, application_id, body.assignee_id)
 
 
 @router.post("/{application_id}/analyst-conclusion", responses=CONFLICT)

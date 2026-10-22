@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Application, ApplicationStatusHistory
 from app.models.enums import ActorType, ApplicationStatus, CloseReason
+from app.services.assignment import auto_assign
 from app.services.status_machine import ensure_transition
 
 S = ApplicationStatus
@@ -30,7 +31,8 @@ async def transition(
     comment: str | None = None,
     close_reason: CloseReason | None = None,
 ) -> None:
-    """Проверяет переход по машине состояний и пишет его в историю. Коммит - на вызывающем."""
+    """Проверяет переход по машине состояний, пишет его в историю и назначает исполнителя
+    этапа. Коммит - на вызывающем."""
     ensure_transition(application.status, target, actor_type)
     if (target == S.CLOSED) != (close_reason is not None):
         raise ValueError("close_reason задаётся только и обязательно при закрытии заявки")
@@ -50,4 +52,5 @@ async def transition(
         setattr(application, field, datetime.now(UTC))
     if close_reason is not None:
         application.close_reason = close_reason
+    await auto_assign(session, application)
     await session.flush()
