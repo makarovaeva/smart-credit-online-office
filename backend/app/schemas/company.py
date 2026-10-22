@@ -29,7 +29,9 @@ class CompanyRequisites(BaseModel):
     okved_main: str
     registration_date: date
     region: str
-    legal_address: str
+    # В формате данных ML адреса и учредителей нет - приходят, только если генератор их отдаёт
+    legal_address: str | None
+    employees_count: int | None = None
     owners: list[CompanyOwnerRead] = Field(description="Учредители и бенефициары из реестра")
 
 
@@ -43,4 +45,3 @@ class CompanyCreate(BaseModel):
 class CompanyRead(CompanyRequisites, ORMModel):
     id: uuid.UUID
     actual_address: str | None
-    employees_count: int | None

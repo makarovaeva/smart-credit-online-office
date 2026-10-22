@@ -1,17 +1,26 @@
-"""Моки внешних источников. Синтетические данные, без сетевых вызовов."""
+"""Моки внешних источников. Данные - из датасета ML или запасного генератора, без сети."""
 
-from app.integrations import bank_turnover, bki, egrul, fns, fssp
-from app.integrations.base import Fetcher, SourceUnavailableError
-from app.integrations.profiles import DEMO_SCENARIOS, CompanyNotFoundError
+from app.integrations import bki, egrul, fns
+from app.integrations.base import (
+    CompanyNotFoundError,
+    Fetcher,
+    SourceUnavailableError,
+    get_record,
+)
+from app.integrations.synthetic import DEMO_SCENARIOS
 from app.models.enums import CheckSource
 
-# Цифровой профиль пока не моделируется: его данные дублируют ФНС и ЕГРЮЛ
+# ФССП, обороты РКО и цифровой профиль в формате ML пока нет
 SOURCES: dict[CheckSource, Fetcher] = {
     CheckSource.EGRUL: egrul.fetch,
     CheckSource.FNS: fns.fetch,
     CheckSource.BKI: bki.fetch,
-    CheckSource.FSSP: fssp.fetch,
-    CheckSource.BANK_TURNOVER: bank_turnover.fetch,
 }
 
-__all__ = ["DEMO_SCENARIOS", "SOURCES", "CompanyNotFoundError", "SourceUnavailableError"]
+__all__ = [
+    "DEMO_SCENARIOS",
+    "SOURCES",
+    "CompanyNotFoundError",
+    "SourceUnavailableError",
+    "get_record",
+]
