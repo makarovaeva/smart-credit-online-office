@@ -66,7 +66,7 @@ cd backend && uv run python -m scripts.export_openapi
 | GET | `/backoffice/applications/{id}` | аналитик, андеррайтер | Карточка: компания, учредители, проверки, метрики, скоринг, AI Credit Memo, решения, история |
 | POST | `/backoffice/applications/{id}/assign` | аналитик, андеррайтер | Назначить исполнителя |
 | POST | `/backoffice/applications/{id}/analyst-conclusion` | аналитик | Заключение: `analyst_escalation → analyst_completed → underwriter_review` |
-| POST | `/backoffice/applications/{id}/decision` | андеррайтер | Одно из 4 решений; `more_information_required` с `more_info_target`: `client` — дозапрос документов, `credit_analyst` — запрос экспертизы |
+| POST | `/backoffice/applications/{id}/decision` | андеррайтер | Одно из 4 решений. `more_information_required` с `more_info_target`: `client` — дозапрос документов, `credit_analyst` — запрос экспертизы. `conditional_approval` с `alternative_offer` берёт условия варианта из AI Credit Memo |
 
 Этапы `data_collection`, `ai_*`, `decision_routing` (включая автоотказ по стоп-фактору), `contract_generation`, `disbursement` двигает конвейер, публичных эндпоинтов для них нет. Внешние источники (ЕГРЮЛ, ФНС, БКИ) — внутренние модули-моки на данных генератора ML в `app/integrations/`, описаны в [`../external-sources.md`](../external-sources.md).
 

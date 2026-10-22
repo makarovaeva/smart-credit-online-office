@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from app.models.enums import (
     AiRecommendation,
+    AlternativeOfferKind,
     CheckSource,
     CheckStatus,
     CounterOfferScenario,
@@ -61,6 +62,20 @@ class ExternalCheckRead(ORMModel):
     error: str | None
     created_at: datetime
     completed_at: datetime | None
+
+
+class AlternativeOfferRead(BaseModel):
+    """Вариант условий, при котором заявка проходит зелёную зону."""
+
+    kind: AlternativeOfferKind
+    amount: Decimal
+    term_months: int
+    rate: Decimal
+    monthly_payment: Decimal
+    dscr: Decimal
+    debt_burden: Decimal | None
+    ltv: Decimal | None
+    description: str = Field(examples=["3 000 000 ₽ на 43 мес. под 18%, платёж 95 174 ₽/мес."])
 
 
 class ScoringFactor(BaseModel):
@@ -119,6 +134,7 @@ class CreditMemoRead(ORMModel):
     recommended_rate: Decimal | None
     recommended_conditions: list[OfferCondition]
     counter_offer_adjustments: list[CounterOfferAdjustment]
+    alternative_offers: list[AlternativeOfferRead]
     analyst_recommendation: AiRecommendation | None
     analyst_id: uuid.UUID | None
     analyst_conclusion: str | None
@@ -151,9 +167,12 @@ class UnderwriterDecisionRequest(BaseModel):
     """approved/conditional_approval требуют условий оффера.
     conditional_approval - контр-предложение: изменены сумма, срок, ставка или обеспечение.
     more_information_required требует more_info_target: client - с info_request (запрос
-    документов формирует ИИ-агент), credit_analyst - с comment (что проверить аналитику)."""
+    документов формирует ИИ-агент), credit_analyst - с comment (что проверить аналитику).
+    alternative_offer (только для conditional_approval) берёт сумму, срок и ставку из
+    варианта в AI Credit Memo; явно переданные поля имеют приоритет."""
 
     decision_type: DecisionType
+    alternative_offer: AlternativeOfferKind | None = None
     approved_amount: MoneyAmount | None = None
     approved_term_months: TermMonths | None = None
     interest_rate: Decimal | None = Field(default=None, gt=0, le=100, decimal_places=2)

@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from app.models.enums import (
     AiRecommendation,
+    AlternativeOfferKind,
     CollateralType,
     CounterOfferScenario,
     EscalationReasonCode,
@@ -141,3 +142,62 @@ def test_unfixable_debt_burden_escalates() -> None:
     assert result.stop_factors == []
     assert result.zone == RiskZone.YELLOW
     assert EscalationReasonCode.NO_COUNTER_OFFER in result.escalation_reasons
+
+
+# --- Альтернативные варианты ---
+
+Kind = AlternativeOfferKind
+
+
+def kinds(result) -> list[AlternativeOfferKind]:
+    return [o.kind for o in result.alternatives]
+
+
+def test_no_alternatives_when_requested_terms_pass() -> None:
+    assert evaluate(GREEN).alternatives == []
+
+
+def test_longer_term_keeps_requested_amount() -> None:
+    result = evaluate(replace(GREEN, ebitda=D("3500000")))
+    # Последовательные сценарии политики режут сумму...
+    assert result.recommended_terms.amount < GREEN.amount
+    # ...а вариант «дольше срок» сохраняет её целиком
+    assert kinds(result) == [Kind.LONGER_TERM, Kind.LOWER_AMOUNT, Kind.MAX_TERM]
+    longer, lower, max_term = result.alternatives
+    assert longer.terms.amount == GREEN.amount
+    assert GREEN.term_months < longer.terms.term_months < GREEN.max_term_months
+    assert lower.terms.term_months == GREEN.term_months
+    assert max_term.terms.term_months == GREEN.max_term_months
+    for offer in result.alternatives:
+        assert offer.metrics.dscr >= DEFAULT_THRESHOLDS.min_dscr
+        assert offer.metrics.debt_burden <= DEFAULT_THRESHOLDS.max_debt_burden
+        assert offer.terms.amount % 1000 == 0
+        assert "мес." in offer.description
+
+
+def test_longest_term_gives_more_than_sequential_scenarios() -> None:
+    result = evaluate(replace(GREEN, ebitda=D("2000000")))
+    # Даже на максимальном сроке всю сумму не сохранить
+    assert kinds(result) == [Kind.LOWER_AMOUNT, Kind.MAX_TERM]
+    assert result.alternatives[1].terms.amount > result.recommended_terms.amount
+
+
+def test_alternatives_respect_hard_caps_and_premium() -> None:
+    ltv = evaluate(
+        replace(
+            GREEN,
+            collateral_type=CollateralType.COMMERCIAL_REAL_ESTATE,
+            collateral_market_value=D("4000000"),
+        )
+    )
+    assert all(o.terms.amount <= D("1960000") for o in ltv.alternatives)
+    assert Kind.LONGER_TERM not in kinds(ltv)
+
+    premium = evaluate(
+        replace(GREEN, ebitda=D("3500000"), signals=RiskSignals(revenue_drop=D("0.25")))
+    )
+    assert {o.terms.rate for o in premium.alternatives} == {D("20")}
+
+
+def test_no_alternatives_when_nothing_fits() -> None:
+    assert evaluate(replace(GREEN, existing_annual_debt_service=D("3500000"))).alternatives == []

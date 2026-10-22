@@ -205,3 +205,45 @@ async def test_pipeline_failure_keeps_client_command(
     assert body["status"] == "submitted"
     application = await session.get(Application, app_id)
     assert application.status == "submitted"
+
+
+async def test_underwriter_picks_alternative_offer(
+    api: AsyncClient,
+    session: AsyncSession,
+    client_user: User,
+    underwriter: User,
+    product: CreditProduct,
+) -> None:
+    # Долговая нагрузка на запрошенных условиях выше 50%: пограничный риск
+    app_id = await start(api, session, client_user, product, "7712345678", amount="5000000.00")
+    pre = await latest(session, PreApproval, app_id)
+    assert any(r["code"] == "alternative_longer_term" for r in pre.recommendations)
+    assert pre.amount_max == Decimal("5000000")
+
+    assert (await submit(api, client_user, app_id))["status"] == "underwriter_review"
+    memo = await latest(session, CreditMemo, app_id)
+    assert memo.ai_recommendation == "counter_offer"
+    longer = next(o for o in memo.alternative_offers if o["kind"] == "longer_term")
+    assert longer["amount"] == "5000000.00"
+
+    url = f"/api/v1/backoffice/applications/{app_id}/decision"
+    wrong = await api.post(
+        url,
+        json={"decision_type": "approved", "alternative_offer": "longer_term"},
+        headers=auth(underwriter),
+    )
+    assert wrong.status_code == 422
+
+    decision = await api.post(
+        url,
+        json={"decision_type": "conditional_approval", "alternative_offer": "longer_term"},
+        headers=auth(underwriter),
+    )
+    assert decision.status_code == 201, decision.text
+    offer = (
+        await api.get(f"/api/v1/applications/{app_id}/offer", headers=auth(client_user))
+    ).json()
+    assert offer["decision_type"] == "conditional_approval"
+    assert offer["approved_amount"] == "5000000.00"
+    assert offer["approved_term_months"] == longer["term_months"]
+    assert offer["interest_rate"] == longer["rate"]

@@ -2,6 +2,7 @@
 
 import uuid
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -96,6 +97,23 @@ def _target_status(body: UnderwriterDecisionRequest) -> ApplicationStatus:
             raise ValidationFailedError("Укажите more_info_target: client или credit_analyst")
 
 
+def _with_alternative(
+    body: UnderwriterDecisionRequest, memo: CreditMemo
+) -> UnderwriterDecisionRequest:
+    """Подставляет условия выбранного варианта из AI Credit Memo в незаполненные поля."""
+    if body.decision_type != DecisionType.CONDITIONAL_APPROVAL:
+        raise ValidationFailedError("Вариант условий выбирается только для контр-предложения")
+    offer = next((o for o in memo.alternative_offers if o["kind"] == body.alternative_offer), None)
+    if offer is None:
+        raise ValidationFailedError("В AI Credit Memo нет такого варианта условий")
+    defaults = {
+        "approved_amount": Decimal(offer["amount"]),
+        "approved_term_months": offer["term_months"],
+        "interest_rate": Decimal(offer["rate"]),
+    }
+    return body.model_copy(update={k: v for k, v in defaults.items() if getattr(body, k) is None})
+
+
 async def make_decision(
     session: AsyncSession,
     underwriter: User,
@@ -103,9 +121,11 @@ async def make_decision(
     body: UnderwriterDecisionRequest,
 ) -> CreditDecision:
     application = await get_application_for_update(session, application_id)
+    memo = await latest_memo(session, application.id)
+    if body.alternative_offer is not None:
+        body = _with_alternative(body, memo)
     target = _target_status(body)
     ensure_transition(application.status, target, ActorType.UNDERWRITER)
-    memo = await latest_memo(session, application.id)
 
     is_offer = target == S.OFFER_GENERATED
     is_final = body.decision_type != DecisionType.MORE_INFORMATION_REQUIRED
