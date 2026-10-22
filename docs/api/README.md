@@ -3,7 +3,7 @@
 Спецификация: [`openapi.json`](openapi.json). Swagger UI — http://localhost:8000/docs.
 
 Реализованы авторизация, CRUD заявок и все команды смены статуса: клиентские и решения аналитика и андеррайтера. Остальные эндпоинты пока заглушки (`501`), но контракт зафиксирован:
-- `/products`, `/companies`;
+- `/products`, `/companies` (кроме `/companies/lookup` — он работает на моке ЕГРЮЛ, демо-ИНН в [`../external-sources.md`](../external-sources.md));
 - документы и ответы на дозапросы;
 - очередь, карточка и назначение в бэкофисе;
 - `/notifications`.
@@ -68,7 +68,7 @@ cd backend && uv run python -m scripts.export_openapi
 | POST | `/backoffice/applications/{id}/analyst-conclusion` | аналитик | Заключение: `analyst_escalation → analyst_completed → underwriter_review` |
 | POST | `/backoffice/applications/{id}/decision` | андеррайтер | Одно из 4 решений; `more_information_required` с `more_info_target`: `client` — дозапрос документов, `credit_analyst` — запрос экспертизы |
 
-Этапы `data_collection`, `ai_*`, `decision_routing` (включая автоотказ по стоп-фактору), `contract_generation`, `disbursement` двигает конвейер, публичных эндпоинтов для них нет. Внешние источники (ЕГРЮЛ, ФНС, БКИ, ФССП, обороты РКО, цифровой профиль) — внутренние модули-моки в `app/integrations/`.
+Этапы `data_collection`, `ai_*`, `decision_routing` (включая автоотказ по стоп-фактору), `contract_generation`, `disbursement` двигает конвейер, публичных эндпоинтов для них нет. Внешние источники (ЕГРЮЛ, ФНС, БКИ) — внутренние модули-моки на данных генератора ML в `app/integrations/`, описаны в [`../external-sources.md`](../external-sources.md).
 
 ## Открытые вопросы
 

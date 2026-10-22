@@ -87,7 +87,7 @@ async def _user(session: AsyncSession, email: str, role: UserRole) -> User:
     return user
 
 
-async def _company(session: AsyncSession, inn: str, owner: User) -> Company:
+async def make_company(session: AsyncSession, inn: str, owner: User) -> Company:
     company = Company(
         inn=inn,
         ogrn="1027700000000",
@@ -129,12 +129,12 @@ async def underwriter(session: AsyncSession) -> User:
 
 @pytest.fixture
 async def company(session: AsyncSession, client_user: User) -> Company:
-    return await _company(session, "7700000001", client_user)
+    return await make_company(session, "7700000001", client_user)
 
 
 @pytest.fixture
 async def other_company(session: AsyncSession, other_client: User) -> Company:
-    return await _company(session, "7700000002", other_client)
+    return await make_company(session, "7700000002", other_client)
 
 
 @pytest.fixture

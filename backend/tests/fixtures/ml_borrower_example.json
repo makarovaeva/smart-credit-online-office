@@ -1,0 +1,46 @@
+{
+  "borrower_id": "SYN-000001",
+  "application_id": "APP-000001",
+  "as_of_date": "2026-10-20",
+  "company": {
+    "name": "ООО Альфа Технологии",
+    "legal_form": "OOO",
+    "inn": "7700000000",
+    "registration_number": "1027700000000",
+    "okved_main": "62.01",
+    "region_code": "77",
+    "registration_date": "2020-05-15",
+    "employees_count": 12
+  },
+  "financials": {
+    "report_year": 2025,
+    "revenue_rub": 25000000,
+    "operating_costs_rub": 21000000,
+    "ebitda_rub": 4000000,
+    "cfads_rub": 2500000,
+    "total_debt_rub": 5000000,
+    "annual_debt_service_rub": 1500000,
+    "assets_rub": 18000000,
+    "liabilities_rub": 8000000,
+    "equity_rub": 10000000
+  },
+  "fns": {
+    "is_active": true,
+    "sme_category": "micro",
+    "annual_income_rub": 25000000,
+    "tax_debt_rub": 0
+  },
+  "bki": {
+    "active_loans": 2,
+    "outstanding_debt_rub": 5000000,
+    "overdue_debt_rub": 0,
+    "max_overdue_days": 0,
+    "credit_history_months": 48
+  },
+  "loan_application": {
+    "requested_amount_rub": 3000000,
+    "term_months": 36,
+    "purpose": "equipment",
+    "collateral_value_rub": 4000000
+  }
+}

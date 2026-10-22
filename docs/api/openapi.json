@@ -285,7 +285,7 @@
           "companies"
         ],
         "summary": "Lookup Company",
-        "description": "Предзаполнение реквизитов по ИНН из (мока) ЕГРЮЛ/ЕГРИП.",
+        "description": "Предзаполнение реквизитов по ИНН из (мока) ЕГРЮЛ/ЕГРИП.\nДемо-ИНН со сценариями - в docs/external-sources.md.",
         "operationId": "lookup_company_api_v1_companies_lookup_get",
         "security": [
           {
@@ -4458,8 +4458,26 @@
             "title": "Region"
           },
           "legal_address": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Legal Address"
+          },
+          "employees_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employees Count"
           },
           "owners": {
             "items": {
@@ -4484,17 +4502,6 @@
               }
             ],
             "title": "Actual Address"
-          },
-          "employees_count": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Employees Count"
           }
         },
         "type": "object",
@@ -4510,8 +4517,7 @@
           "legal_address",
           "owners",
           "id",
-          "actual_address",
-          "employees_count"
+          "actual_address"
         ],
         "title": "CompanyRead"
       },
@@ -4557,8 +4563,26 @@
             "title": "Region"
           },
           "legal_address": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Legal Address"
+          },
+          "employees_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employees Count"
           },
           "owners": {
             "items": {
