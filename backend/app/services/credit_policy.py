@@ -10,6 +10,7 @@ from decimal import ROUND_DOWN, Decimal
 
 from app.models.enums import (
     AiRecommendation,
+    AlternativeOfferKind,
     CollateralType,
     CounterOfferScenario,
     EscalationReasonCode,
@@ -154,6 +155,15 @@ class Adjustment:
 
 
 @dataclass(frozen=True)
+class AlternativeOffer:
+    kind: AlternativeOfferKind
+    terms: Terms
+    metrics: Metrics
+    monthly_payment: Decimal
+    description: str
+
+
+@dataclass(frozen=True)
 class PolicyResult:
     zone: RiskZone
     recommendation: AiRecommendation
@@ -164,6 +174,8 @@ class PolicyResult:
     recommended_terms: Terms | None = None
     recommended_metrics: Metrics | None = None
     adjustments: list[Adjustment] = field(default_factory=list)
+    # Варианты условий, если запрошенные не проходят зелёную зону
+    alternatives: list[AlternativeOffer] = field(default_factory=list)
 
 
 def monthly_payment(amount: Decimal, term_months: int, rate: Decimal) -> Decimal:
@@ -224,6 +236,13 @@ def evaluate(data: PolicyInput, t: PolicyThresholds = DEFAULT_THRESHOLDS) -> Pol
     if not _is_green(data, terms, metrics, t):
         escalation.append(Escalation.NO_COUNTER_OFFER)
 
+    # Ставка с риск-надбавкой одна для всех вариантов
+    at_rate = Terms(data.amount, data.term_months, terms.rate)
+    alternatives = (
+        []
+        if _is_green(data, at_rate, calculate_metrics(data, at_rate), t)
+        else _alternatives(data, terms.rate, t)
+    )
     return PolicyResult(
         zone=RiskZone.YELLOW if escalation else RiskZone.GREEN,
         recommendation=(
@@ -235,6 +254,7 @@ def evaluate(data: PolicyInput, t: PolicyThresholds = DEFAULT_THRESHOLDS) -> Pol
         recommended_terms=terms,
         recommended_metrics=metrics,
         adjustments=adjustments,
+        alternatives=alternatives,
     )
 
 
@@ -361,3 +381,75 @@ def _counter_offer(
         )
 
     return terms, adjustments
+
+
+# --- Альтернативные варианты при пограничном риске ---
+
+
+def _amount_caps(data: PolicyInput, t: PolicyThresholds) -> Decimal:
+    """Жёсткие ограничения суммы, не зависящие от срока: запрос, лимит автоодобрения, LTV."""
+    caps = [data.amount, _auto_approval_limit(data, t)]
+    if pledged := collateral_value(data):
+        caps.append(pledged * t.max_ltv)
+    return min(caps)
+
+
+def _max_amount(
+    data: PolicyInput, term_months: int, rate: Decimal, t: PolicyThresholds
+) -> Decimal | None:
+    """Наибольшая сумма на сроке, при которой DSCR >= min_dscr и Debt Burden <= max."""
+    max_debt_service = min(data.ebitda / t.min_dscr, data.ebitda * t.max_debt_burden)
+    payment = (max_debt_service - data.existing_annual_debt_service) / 12
+    if payment <= 0:
+        return None
+    by_payment = max_amount_for_payment(payment, term_months, rate)
+    amount = _round_amount(min(_amount_caps(data, t), by_payment), t)
+    return amount if amount >= data.min_amount else None
+
+
+def _min_term(data: PolicyInput, amount: Decimal, rate: Decimal, t: PolicyThresholds) -> int | None:
+    for term in range(data.term_months, data.max_term_months + 1):
+        terms = Terms(amount, term, rate)
+        if _is_green(data, terms, calculate_metrics(data, terms), t):
+            return term
+    return None
+
+
+def _format_rub(value: Decimal) -> str:
+    return f"{value:,.0f}".replace(",", " ")
+
+
+def _alternatives(data: PolicyInput, rate: Decimal, t: PolicyThresholds) -> list[AlternativeOffer]:
+    candidates: list[tuple[AlternativeOfferKind, Terms | None]] = []
+    keep_amount = _round_amount(_amount_caps(data, t), t)
+    term = _min_term(data, keep_amount, rate, t)
+    # Проходит без продления - это уже вариант «меньше сумма»
+    longer = term is not None and term > data.term_months
+    candidates.append(
+        (AlternativeOfferKind.LONGER_TERM, Terms(keep_amount, term, rate) if longer else None)
+    )
+    for kind, term in (
+        (AlternativeOfferKind.LOWER_AMOUNT, data.term_months),
+        (AlternativeOfferKind.MAX_TERM, data.max_term_months),
+    ):
+        amount = _max_amount(data, term, rate, t)
+        candidates.append((kind, Terms(amount, term, rate) if amount else None))
+
+    offers: list[AlternativeOffer] = []
+    for kind, terms in candidates:
+        if terms is None or any(o.terms == terms for o in offers):
+            continue
+        payment = monthly_payment(terms.amount, terms.term_months, terms.rate)
+        offers.append(
+            AlternativeOffer(
+                kind=kind,
+                terms=terms,
+                metrics=calculate_metrics(data, terms),
+                monthly_payment=payment.quantize(Decimal("0.01")),
+                description=(
+                    f"{_format_rub(terms.amount)} ₽ на {terms.term_months} мес. под {terms.rate}%, "
+                    f"платёж {_format_rub(payment)} ₽/мес."
+                ),
+            )
+        )
+    return offers

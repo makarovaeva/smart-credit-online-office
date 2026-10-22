@@ -3086,6 +3086,86 @@
         ],
         "title": "AiRecommendation"
       },
+      "AlternativeOfferKind": {
+        "type": "string",
+        "enum": [
+          "longer_term",
+          "lower_amount",
+          "max_term"
+        ],
+        "title": "AlternativeOfferKind",
+        "description": "Альтернативные варианты условий при пограничном риске - каждый проходит зелёную зону."
+      },
+      "AlternativeOfferRead": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/AlternativeOfferKind"
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount"
+          },
+          "term_months": {
+            "type": "integer",
+            "title": "Term Months"
+          },
+          "rate": {
+            "type": "string",
+            "title": "Rate"
+          },
+          "monthly_payment": {
+            "type": "string",
+            "title": "Monthly Payment"
+          },
+          "dscr": {
+            "type": "string",
+            "title": "Dscr"
+          },
+          "debt_burden": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Debt Burden"
+          },
+          "ltv": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ltv"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "examples": [
+              "3 000 000 ₽ на 43 мес. под 18%, платёж 95 174 ₽/мес."
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "amount",
+          "term_months",
+          "rate",
+          "monthly_payment",
+          "dscr",
+          "debt_burden",
+          "ltv",
+          "description"
+        ],
+        "title": "AlternativeOfferRead",
+        "description": "Вариант условий, при котором заявка проходит зелёную зону."
+      },
       "AnalystConclusionRequest": {
         "properties": {
           "conclusion": {
@@ -4788,6 +4868,13 @@
             "type": "array",
             "title": "Counter Offer Adjustments"
           },
+          "alternative_offers": {
+            "items": {
+              "$ref": "#/components/schemas/AlternativeOfferRead"
+            },
+            "type": "array",
+            "title": "Alternative Offers"
+          },
           "analyst_recommendation": {
             "anyOf": [
               {
@@ -4850,6 +4937,7 @@
           "recommended_rate",
           "recommended_conditions",
           "counter_offer_adjustments",
+          "alternative_offers",
           "analyst_recommendation",
           "analyst_id",
           "analyst_conclusion",
@@ -6335,6 +6423,16 @@
           "decision_type": {
             "$ref": "#/components/schemas/DecisionType"
           },
+          "alternative_offer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AlternativeOfferKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "approved_amount": {
             "anyOf": [
               {
@@ -6443,7 +6541,7 @@
           "decision_type"
         ],
         "title": "UnderwriterDecisionRequest",
-        "description": "approved/conditional_approval требуют условий оффера.\nconditional_approval - контр-предложение: изменены сумма, срок, ставка или обеспечение.\nmore_information_required требует more_info_target: client - с info_request (запрос\nдокументов формирует ИИ-агент), credit_analyst - с comment (что проверить аналитику)."
+        "description": "approved/conditional_approval требуют условий оффера.\nconditional_approval - контр-предложение: изменены сумма, срок, ставка или обеспечение.\nmore_information_required требует more_info_target: client - с info_request (запрос\nдокументов формирует ИИ-агент), credit_analyst - с comment (что проверить аналитику).\nalternative_offer (только для conditional_approval) берёт сумму, срок и ставку из\nварианта в AI Credit Memo; явно переданные поля имеют приоритет."
       },
       "UserCompany": {
         "properties": {

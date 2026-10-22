@@ -154,13 +154,19 @@ def _pre_approval(
     probability = GRADE_PROBABILITY[scoring.risk_grade]
     if policy.zone == RiskZone.YELLOW:
         probability *= YELLOW_PROBABILITY_FACTOR
+    # Верхняя граница - лучший из вариантов: основной или альтернативный
+    amount_max = max([terms.amount, *(o.terms.amount for o in policy.alternatives)])
     return PreApproval(
         **common,
         approval_probability=probability.quantize(Decimal("0.0001")),
         amount_min=min(product.min_amount, terms.amount),
-        amount_max=terms.amount,
+        amount_max=amount_max,
         estimated_rate=terms.rate,
         recommendations=[{"code": a.scenario, "message": a.description} for a in policy.adjustments]
+        + [
+            {"code": f"alternative_{o.kind}", "message": f"Возможный вариант: {o.description}"}
+            for o in policy.alternatives
+        ]
         + [
             {
                 "code": item["code"],
@@ -281,6 +287,20 @@ def _credit_memo(
                 "description": a.description,
             }
             for a in policy.adjustments
+        ],
+        alternative_offers=[
+            {
+                "kind": o.kind,
+                "amount": f"{o.terms.amount:.2f}",
+                "term_months": o.terms.term_months,
+                "rate": f"{o.terms.rate:.2f}",
+                "monthly_payment": str(o.monthly_payment),
+                "dscr": str(_ratio(o.metrics.dscr)),
+                "debt_burden": str(_ratio(o.metrics.debt_burden)),
+                "ltv": str(_ratio(o.metrics.ltv)) if o.metrics.ltv is not None else None,
+                "description": o.description,
+            }
+            for o in policy.alternatives
         ],
     )
 

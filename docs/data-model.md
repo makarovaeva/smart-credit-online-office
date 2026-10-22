@@ -125,6 +125,7 @@ erDiagram
         numeric recommended_amount
         jsonb recommended_conditions
         jsonb counter_offer_adjustments
+        jsonb alternative_offers
         string analyst_recommendation
         uuid analyst_id FK
         text analyst_conclusion

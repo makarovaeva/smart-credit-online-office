@@ -215,6 +215,17 @@ class EscalationReasonCode(StrEnum):
     MISSING_EXTERNAL_DATA = "missing_external_data"
 
 
+class AlternativeOfferKind(StrEnum):
+    """Альтернативные варианты условий при пограничном риске - каждый проходит зелёную зону."""
+
+    # Сумма сохраняется, срок - минимальный проходящий
+    LONGER_TERM = "longer_term"
+    # Срок как в заявке, сумма - максимальная проходящая
+    LOWER_AMOUNT = "lower_amount"
+    # Максимальный срок продукта и наибольшая сумма на нём
+    MAX_TERM = "max_term"
+
+
 class CounterOfferScenario(StrEnum):
     """Сценарии контр-предложения ИИ из кредитной политики."""
 
