@@ -5224,7 +5224,8 @@
           "high_ltv",
           "weak_credit_history",
           "severe_revenue_drop",
-          "no_counter_offer"
+          "no_counter_offer",
+          "missing_external_data"
         ],
         "title": "EscalationReasonCode",
         "description": "Основания передачи кредитному аналитику (жёлтая зона)."

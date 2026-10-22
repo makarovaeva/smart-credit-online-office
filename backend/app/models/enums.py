@@ -212,6 +212,7 @@ class EscalationReasonCode(StrEnum):
     # Допущения: на доске эти случаи не описаны
     SEVERE_REVENUE_DROP = "severe_revenue_drop"
     NO_COUNTER_OFFER = "no_counter_offer"
+    MISSING_EXTERNAL_DATA = "missing_external_data"
 
 
 class CounterOfferScenario(StrEnum):

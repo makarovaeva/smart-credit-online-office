@@ -33,6 +33,7 @@ from app.schemas.application import (
     ApplicationUpdate,
     ClientStatus,
 )
+from app.services import pipeline
 from app.services.client_status import client_status
 from app.services.errors import ConflictError, NotFoundError, ValidationFailedError
 from app.services.transitions import transition
@@ -266,6 +267,7 @@ async def give_consents(
         )
     await transition(session, application, S.DATA_COLLECTION, ActorType.CLIENT, user.id)
     await session.commit()
+    await pipeline.run_safely(session, application, pipeline.run_data_collection)
     return application
 
 
@@ -326,6 +328,7 @@ async def submit_application(
             raise ValidationFailedError("Укажите тип и рыночную стоимость залога")
     await transition(session, application, S.SUBMITTED, ActorType.CLIENT, user.id)
     await session.commit()
+    await pipeline.run_safely(session, application, pipeline.run_assessment)
     return application
 
 

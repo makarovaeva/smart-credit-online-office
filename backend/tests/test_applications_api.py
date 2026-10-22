@@ -224,7 +224,7 @@ async def test_terms_are_locked_after_submit(
 # --- Согласия, предварительный расчёт, подача ---
 
 
-async def test_consents_move_draft_to_data_collection(
+async def test_consents_start_data_collection(
     api: AsyncClient, client_user: User, draft: dict
 ) -> None:
     url = f"/api/v1/applications/{draft['id']}/consents"
@@ -233,7 +233,12 @@ async def test_consents_move_draft_to_data_collection(
 
     response = await api.post(url, json={"types": ALL_CONSENTS}, headers=auth(client_user))
     assert response.status_code == 200, response.text
-    assert response.json()["status"] == "data_collection"
+    # Конвейер сразу собирает данные и делает предварительный расчёт
+    assert response.json()["status"] == "pre_approved"
+    assert (await statuses(api, client_user, draft["id"]))[:2] == [
+        "data_collection",
+        "pre_approved",
+    ]
     consents = await api.get(url, headers=auth(client_user))
     assert sorted(c["type"] for c in consents.json()) == sorted(ALL_CONSENTS)
 
@@ -251,9 +256,11 @@ async def test_submit_requires_pre_approval(
     response = await api.post(url, headers=auth(client_user))
     assert response.status_code == 200
     body = response.json()
-    assert body["status"] == "submitted"
-    assert body["client_status"] == "created"
     assert body["submitted_at"] is not None
+    # Выручка в анкете (30 млн) расходится с ФНС - конвейер отправляет заявку аналитику
+    assert body["status"] == "analyst_escalation"
+    assert body["client_status"] == "under_review"
+    assert "submitted" in await statuses(api, client_user, draft["id"])
 
 
 async def test_submit_requires_collateral_data(
