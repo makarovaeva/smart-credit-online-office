@@ -15,6 +15,12 @@ class NotFoundError(DomainError):
     status_code = 404
 
 
+class ForbiddenError(DomainError):
+    """Действие доступно другому сотруднику: заявка назначена не на него."""
+
+    status_code = 403
+
+
 class ConflictError(DomainError):
     """Действие недопустимо в текущем статусе или устарела версия."""
 

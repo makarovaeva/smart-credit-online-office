@@ -84,10 +84,8 @@ async def statuses(api: AsyncClient, user: User, application_id: str) -> list[st
 # --- Авторизация ---
 
 
-async def test_login_and_me(api: AsyncClient, client_user: User, company: Company) -> None:
-    response = await api.post(
-        "/api/v1/auth/login", json={"email": "CLIENT@example.com", "password": PASSWORD}
-    )
+async def test_phone_login_and_me(api: AsyncClient, client_user: User, company: Company) -> None:
+    response = await api.post("/api/v1/auth/login/phone", json={"phone": "8 (999) 000-01-01"})
     assert response.status_code == 200
     token = response.json()["access_token"]
 
@@ -96,11 +94,31 @@ async def test_login_and_me(api: AsyncClient, client_user: User, company: Compan
     assert me.json()["companies"][0]["company_id"] == str(company.id)
 
 
-async def test_wrong_password(api: AsyncClient, client_user: User) -> None:
-    response = await api.post(
-        "/api/v1/auth/login", json={"email": "client@example.com", "password": "wrong"}
+async def test_employee_password_login(
+    api: AsyncClient, client_user: User, underwriter: User
+) -> None:
+    ok = await api.post(
+        "/api/v1/auth/login", json={"email": "UNDERWRITER@example.com", "password": PASSWORD}
     )
-    assert response.status_code == 401
+    assert ok.status_code == 200
+    wrong = await api.post(
+        "/api/v1/auth/login", json={"email": "underwriter@example.com", "password": "wrong"}
+    )
+    assert wrong.status_code == 401
+    # Клиенты по паролю не входят - только по телефону
+    client = await api.post(
+        "/api/v1/auth/login", json={"email": "client@example.com", "password": PASSWORD}
+    )
+    assert client.status_code == 401
+
+
+async def test_phone_login_rejects_unknown_and_employees(
+    api: AsyncClient, client_user: User
+) -> None:
+    unknown = await api.post("/api/v1/auth/login/phone", json={"phone": "+79991234567"})
+    assert unknown.status_code == 401
+    invalid = await api.post("/api/v1/auth/login/phone", json={"phone": "12345"})
+    assert invalid.status_code == 422
 
 
 async def test_requires_token_and_client_role(api: AsyncClient, analyst: User) -> None:

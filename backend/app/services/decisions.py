@@ -17,7 +17,12 @@ from app.models.enums import (
     MoreInfoTarget,
 )
 from app.schemas.decision import AnalystConclusionRequest, UnderwriterDecisionRequest
-from app.services.errors import ConflictError, NotFoundError, ValidationFailedError
+from app.services.errors import (
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+    ValidationFailedError,
+)
 from app.services.status_machine import ensure_transition
 from app.services.transitions import transition
 
@@ -33,6 +38,13 @@ async def get_application_for_update(
     if application is None:
         raise NotFoundError("Заявка не найдена")
     return application
+
+
+def ensure_assignee(application: Application, user: User) -> None:
+    """Решение по заявке принимает её исполнитель. Без исполнителя (в системе не было
+    сотрудника нужной роли) - любой сотрудник этой роли."""
+    if application.assignee_id not in (None, user.id):
+        raise ForbiddenError("Заявка назначена другому сотруднику")
 
 
 async def latest_memo(session: AsyncSession, application_id: uuid.UUID) -> CreditMemo:
@@ -52,6 +64,7 @@ async def complete_analysis(
 ) -> CreditMemo:
     application = await get_application_for_update(session, application_id)
     ensure_transition(application.status, S.ANALYST_COMPLETED, ActorType.CREDIT_ANALYST)
+    ensure_assignee(application, analyst)
     memo = await latest_memo(session, application.id)
 
     memo.analyst_id = analyst.id
@@ -69,7 +82,6 @@ async def complete_analysis(
         session, application, S.ANALYST_COMPLETED, ActorType.CREDIT_ANALYST, analyst.id
     )
     await transition(session, application, S.UNDERWRITER_REVIEW, ActorType.SYSTEM)
-    application.assignee_id = None
     await session.commit()
     return memo
 
@@ -121,6 +133,7 @@ async def make_decision(
     body: UnderwriterDecisionRequest,
 ) -> CreditDecision:
     application = await get_application_for_update(session, application_id)
+    ensure_assignee(application, underwriter)
     memo = await latest_memo(session, application.id)
     if body.alternative_offer is not None:
         body = _with_alternative(body, memo)
@@ -169,6 +182,5 @@ async def make_decision(
     )
     if is_final:
         application.decided_at = now
-    application.assignee_id = None
     await session.commit()
     return decision
