@@ -1,0 +1,79 @@
+# Единая точка запуска решения: docker compose up --build (из корня репозитория).
+# Настройки - в .env (шаблон: .env.example), без него работают значения по умолчанию.
+name: smart-credit
+
+services:
+  db:
+    image: postgres:16.15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-credit}
+      POSTGRES_USER: ${POSTGRES_USER:-credit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-credit}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [app]
+
+  backend:
+    build: ./backend
+    image: smart-credit/backend:local
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-credit}:${POSTGRES_PASSWORD:-credit}@db:5432/${POSTGRES_DB:-credit}
+      ENVIRONMENT: ${ENVIRONMENT:-docker}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:3000"]}
+      # Миграции применяются всегда, демо-данные (scripts/seed.py) - если true
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
+      # Датасет профилей заёмщиков от ML в ./data; пусто - моки генерируют данные сами
+      BORROWER_DATASET_PATH: ${BORROWER_DATASET_PATH:-}
+      SCORING_MODEL: ${SCORING_MODEL:-rules}
+    volumes:
+      - ./data:/data:ro
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/ready', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      # Миграции и демо-данные при первом старте
+      start_period: 30s
+    networks: [app]
+
+  # Фронтенд и ML-сервис подключаются, когда появятся в репозитории:
+  #
+  # frontend:
+  #   build: ./frontend
+  #   ports: ["${FRONTEND_PORT:-3000}:3000"]
+  #   environment:
+  #     API_URL: http://backend:8000/api/v1
+  #   depends_on:
+  #     backend: {condition: service_healthy}
+  #   networks: [app]
+  #
+  # ml:
+  #   build: ./ml
+  #   healthcheck: ...
+  #   networks: [app]
+  # + у backend: SCORING_MODEL и адрес ML-сервиса, depends_on: ml
+
+volumes:
+  postgres_data:
+
+networks:
+  app:
