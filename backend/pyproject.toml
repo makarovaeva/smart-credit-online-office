@@ -23,6 +23,11 @@ dev = [
     "openapi-spec-validator>=0.7",
     "pyyaml>=6.0",
 ]
+# Генератор синтетических данных ML (ml/synthetic_data); в образ API не ставится:
+# uv run --project backend --group ml python ml/synthetic_data/...
+ml = [
+    "numpy>=2.5.4",
+]
 
 [tool.uv]
 package = false

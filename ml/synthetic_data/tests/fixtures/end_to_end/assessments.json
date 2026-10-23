@@ -1,0 +1,733 @@
+[
+  {
+    "assessment_id": "asm_01M5CM9FR09G32YRK7NB19FSE9",
+    "application_id": "app_01M5CKC680SSCSWCET9EPWZEAV",
+    "sequence": 1,
+    "status": "completed",
+    "trigger": "initial",
+    "policy_version": "2026.10_demo",
+    "model_version": "synthetic_rules_v0.1_not_ml",
+    "calculated_at": "2026-10-20T12:24:00Z",
+    "inputs": {
+      "loan_amount": 2000000,
+      "term_months": 24,
+      "rate_pct": 22.0,
+      "annual_turnover": 30000000,
+      "ebitda": 8000000,
+      "existing_debt_service_12m": 0,
+      "new_debt_service_12m": 1245076,
+      "total_future_debt_service": 1245076,
+      "collateral_market_value": null,
+      "collateral_haircut_pct": null,
+      "business_age_months": 79,
+      "revenue_change_pct": 5.0,
+      "cash_flow_negative_months": 0,
+      "credit_history_quality": "good"
+    },
+    "metrics": {
+      "dscr": 6.4253,
+      "ltv_pct": null,
+      "debt_burden_pct": 15.56
+    },
+    "ai_scoring": {
+      "risk_grade": "A",
+      "risk_score": 95,
+      "model_confidence_pct": 90.0
+    },
+    "stop_factor_checks": [
+      {
+        "code": "bankruptcy",
+        "group": "legal",
+        "triggered": false,
+        "actual": "none",
+        "source": "fns_data.bankruptcy_status"
+      },
+      {
+        "code": "observation_procedure",
+        "group": "legal",
+        "triggered": false,
+        "actual": "none",
+        "source": "fns_data.bankruptcy_status"
+      },
+      {
+        "code": "account_blocked_115fz",
+        "group": "legal",
+        "triggered": false,
+        "actual": false,
+        "source": "fns_data.has_account_block_115fz"
+      },
+      {
+        "code": "sanctions",
+        "group": "legal",
+        "triggered": false,
+        "actual": false,
+        "source": "compliance.sanctions_hit"
+      },
+      {
+        "code": "prohibited_activity",
+        "group": "legal",
+        "triggered": false,
+        "actual": false,
+        "source": "compliance.is_prohibited_activity"
+      },
+      {
+        "code": "cash_flow_negative_over_3m",
+        "group": "financial",
+        "triggered": false,
+        "actual": 0,
+        "source": "inputs.cash_flow_negative_months"
+      },
+      {
+        "code": "dscr_below_0_9",
+        "group": "financial",
+        "triggered": false,
+        "actual": 6.4253,
+        "source": "metrics.dscr"
+      },
+      {
+        "code": "mass_address",
+        "group": "fictitiousness",
+        "triggered": false,
+        "actual": false,
+        "source": "fns_data.is_mass_address"
+      },
+      {
+        "code": "mass_director",
+        "group": "fictitiousness",
+        "triggered": false,
+        "actual": false,
+        "source": "fns_data.is_mass_director"
+      },
+      {
+        "code": "no_tax_activity",
+        "group": "fictitiousness",
+        "triggered": false,
+        "actual": true,
+        "source": "fns_data.has_tax_activity"
+      }
+    ],
+    "escalation_checks": [
+      {
+        "code": "business_age_lt_12m",
+        "triggered": false,
+        "actual": 79,
+        "threshold": 12
+      },
+      {
+        "code": "model_confidence_lt_80",
+        "triggered": false,
+        "actual": 90.0,
+        "threshold": 80
+      },
+      {
+        "code": "conflicting_sources",
+        "triggered": false,
+        "actual": 0,
+        "threshold": 0
+      }
+    ],
+    "green_zone_checks": [
+      {
+        "code": "amount_limit",
+        "actual": 2000000,
+        "operator": "<=",
+        "threshold": 5000000,
+        "passed": true
+      },
+      {
+        "code": "dscr",
+        "actual": 6.4253,
+        "operator": ">=",
+        "threshold": 1.1,
+        "passed": true
+      },
+      {
+        "code": "ltv",
+        "actual": null,
+        "operator": "<=",
+        "threshold": 70.0,
+        "passed": null
+      },
+      {
+        "code": "revenue_change",
+        "actual": 5.0,
+        "operator": ">",
+        "threshold": -20.0,
+        "passed": true
+      },
+      {
+        "code": "credit_history",
+        "actual": "good",
+        "operator": "!=",
+        "threshold": "weak",
+        "passed": true
+      }
+    ],
+    "route": "green_zone",
+    "counter_offer_triggers": [],
+    "auto_decline": null,
+    "ai_credit_memo": {
+      "summary": "Синтетический расчёт: выполнены демонстрационные условия зелёной зоны",
+      "key_risks": [],
+      "recommendation": "approve",
+      "generated_at": "2026-10-20T12:24:00Z"
+    },
+    "analyst_conclusion": null,
+    "created_at": "2026-10-20T12:24:00Z"
+  },
+  {
+    "assessment_id": "asm_01M5CM9FR0XDAWBBYRXVKN352Z",
+    "application_id": "app_01M5CKC680YF4BY30B3ACN6FKH",
+    "sequence": 1,
+    "status": "completed",
+    "trigger": "initial",
+    "policy_version": "2026.10_demo",
+    "model_version": "synthetic_rules_v0.1_not_ml",
+    "calculated_at": "2026-10-20T12:24:00Z",
+    "inputs": {
+      "loan_amount": 1000000,
+      "term_months": 24,
+      "rate_pct": 22.0,
+      "annual_turnover": 8000000,
+      "ebitda": -200000,
+      "existing_debt_service_12m": 720000,
+      "new_debt_service_12m": 622538,
+      "total_future_debt_service": 1342538,
+      "collateral_market_value": null,
+      "collateral_haircut_pct": null,
+      "business_age_months": 88,
+      "revenue_change_pct": -25.0,
+      "cash_flow_negative_months": 5,
+      "credit_history_quality": "weak"
+    },
+    "metrics": {
+      "dscr": -0.149,
+      "ltv_pct": null,
+      "debt_burden_pct": null
+    },
+    "ai_scoring": {
+      "risk_grade": "D",
+      "risk_score": 47,
+      "model_confidence_pct": 90.0
+    },
+    "stop_factor_checks": [
+      {
+        "code": "bankruptcy",
+        "group": "legal",
+        "triggered": true,
+        "actual": "bankruptcy",
+        "source": "fns_data.bankruptcy_status"
+      },
+      {
+        "code": "observation_procedure",
+        "group": "legal",
+        "triggered": false,
+        "actual": "bankruptcy",
+        "source": "fns_data.bankruptcy_status"
+      },
+      {
+        "code": "account_blocked_115fz",
+        "group": "legal",
+        "triggered": false,
+        "actual": false,
+        "source": "fns_data.has_account_block_115fz"
+      },
+      {
+        "code": "sanctions",
+        "group": "legal",
+        "triggered": false,
+        "actual": false,
+        "source": "compliance.sanctions_hit"
+      },
+      {
+        "code": "prohibited_activity",
+        "group": "legal",
+        "triggered": false,
+        "actual": false,
+        "source": "compliance.is_prohibited_activity"
+      },
+      {
+        "code": "cash_flow_negative_over_3m",
+        "group": "financial",
+        "triggered": true,
+        "actual": 5,
+        "source": "inputs.cash_flow_negative_months"
+      },
+      {
+        "code": "dscr_below_0_9",
+        "group": "financial",
+        "triggered": true,
+        "actual": -0.149,
+        "source": "metrics.dscr"
+      },
+      {
+        "code": "mass_address",
+        "group": "fictitiousness",
+        "triggered": false,
+        "actual": false,
+        "source": "fns_data.is_mass_address"
+      },
+      {
+        "code": "mass_director",
+        "group": "fictitiousness",
+        "triggered": false,
+        "actual": false,
+        "source": "fns_data.is_mass_director"
+      },
+      {
+        "code": "no_tax_activity",
+        "group": "fictitiousness",
+        "triggered": false,
+        "actual": true,
+        "source": "fns_data.has_tax_activity"
+      }
+    ],
+    "escalation_checks": [
+      {
+        "code": "business_age_lt_12m",
+        "triggered": false,
+        "actual": 88,
+        "threshold": 12
+      },
+      {
+        "code": "model_confidence_lt_80",
+        "triggered": false,
+        "actual": 90.0,
+        "threshold": 80
+      },
+      {
+        "code": "conflicting_sources",
+        "triggered": false,
+        "actual": 0,
+        "threshold": 0
+      }
+    ],
+    "green_zone_checks": [
+      {
+        "code": "amount_limit",
+        "actual": 1000000,
+        "operator": "<=",
+        "threshold": 1600000.0,
+        "passed": true
+      },
+      {
+        "code": "dscr",
+        "actual": -0.149,
+        "operator": ">=",
+        "threshold": 1.1,
+        "passed": false
+      },
+      {
+        "code": "ltv",
+        "actual": null,
+        "operator": "<=",
+        "threshold": 70.0,
+        "passed": null
+      },
+      {
+        "code": "revenue_change",
+        "actual": -25.0,
+        "operator": ">",
+        "threshold": -20.0,
+        "passed": false
+      },
+      {
+        "code": "credit_history",
+        "actual": "weak",
+        "operator": "!=",
+        "threshold": "weak",
+        "passed": false
+      }
+    ],
+    "route": "auto_decline",
+    "counter_offer_triggers": [],
+    "auto_decline": {
+      "reason_codes": [
+        "bankruptcy",
+        "cash_flow_negative_over_3m",
+        "dscr_below_0_9"
+      ],
+      "client_explanation": "Автоматическая проверка выявила стоп-факторы.",
+      "declined_at": "2026-10-20T12:24:00Z"
+    },
+    "ai_credit_memo": {
+      "summary": "Синтетический расчёт: сработали стоп-факторы",
+      "key_risks": [
+        "bankruptcy",
+        "cash_flow_negative_over_3m",
+        "dscr_below_0_9"
+      ],
+      "recommendation": "decline",
+      "generated_at": "2026-10-20T12:24:00Z"
+    },
+    "analyst_conclusion": null,
+    "created_at": "2026-10-20T12:24:00Z"
+  },
+  {
+    "assessment_id": "asm_01M5CM9FR0A8C9EF4M6WC4Z2RE",
+    "application_id": "app_01M5CKC680494B0HECWRMDEXJ3",
+    "sequence": 1,
+    "status": "completed",
+    "trigger": "initial",
+    "policy_version": "2026.10_demo",
+    "model_version": "synthetic_rules_v0.1_not_ml",
+    "calculated_at": "2026-10-20T12:24:00Z",
+    "inputs": {
+      "loan_amount": 4500000,
+      "term_months": 24,
+      "rate_pct": 22.0,
+      "annual_turnover": 20000000,
+      "ebitda": 9000000,
+      "existing_debt_service_12m": 0,
+      "new_debt_service_12m": 2801420,
+      "total_future_debt_service": 2801420,
+      "collateral_market_value": null,
+      "collateral_haircut_pct": null,
+      "business_age_months": 104,
+      "revenue_change_pct": 4.0,
+      "cash_flow_negative_months": 0,
+      "credit_history_quality": "good"
+    },
+    "metrics": {
+      "dscr": 3.2127,
+      "ltv_pct": null,
+      "debt_burden_pct": 31.13
+    },
+    "ai_scoring": {
+      "risk_grade": "A",
+      "risk_score": 95,
+      "model_confidence_pct": 90.0
+    },
+    "stop_factor_checks": [
+      {
+        "code": "bankruptcy",
+        "group": "legal",
+        "triggered": false,
+        "actual": "none",
+        "source": "fns_data.bankruptcy_status"
+      },
+      {
+        "code": "observation_procedure",
+        "group": "legal",
+        "triggered": false,
+        "actual": "none",
+        "source": "fns_data.bankruptcy_status"
+      },
+      {
+        "code": "account_blocked_115fz",
+        "group": "legal",
+        "triggered": false,
+        "actual": false,
+        "source": "fns_data.has_account_block_115fz"
+      },
+      {
+        "code": "sanctions",
+        "group": "legal",
+        "triggered": false,
+        "actual": false,
+        "source": "compliance.sanctions_hit"
+      },
+      {
+        "code": "prohibited_activity",
+        "group": "legal",
+        "triggered": false,
+        "actual": false,
+        "source": "compliance.is_prohibited_activity"
+      },
+      {
+        "code": "cash_flow_negative_over_3m",
+        "group": "financial",
+        "triggered": false,
+        "actual": 0,
+        "source": "inputs.cash_flow_negative_months"
+      },
+      {
+        "code": "dscr_below_0_9",
+        "group": "financial",
+        "triggered": false,
+        "actual": 3.2127,
+        "source": "metrics.dscr"
+      },
+      {
+        "code": "mass_address",
+        "group": "fictitiousness",
+        "triggered": false,
+        "actual": false,
+        "source": "fns_data.is_mass_address"
+      },
+      {
+        "code": "mass_director",
+        "group": "fictitiousness",
+        "triggered": false,
+        "actual": false,
+        "source": "fns_data.is_mass_director"
+      },
+      {
+        "code": "no_tax_activity",
+        "group": "fictitiousness",
+        "triggered": false,
+        "actual": true,
+        "source": "fns_data.has_tax_activity"
+      }
+    ],
+    "escalation_checks": [
+      {
+        "code": "business_age_lt_12m",
+        "triggered": false,
+        "actual": 104,
+        "threshold": 12
+      },
+      {
+        "code": "model_confidence_lt_80",
+        "triggered": false,
+        "actual": 90.0,
+        "threshold": 80
+      },
+      {
+        "code": "conflicting_sources",
+        "triggered": false,
+        "actual": 0,
+        "threshold": 0
+      }
+    ],
+    "green_zone_checks": [
+      {
+        "code": "amount_limit",
+        "actual": 4500000,
+        "operator": "<=",
+        "threshold": 4000000.0,
+        "passed": false
+      },
+      {
+        "code": "dscr",
+        "actual": 3.2127,
+        "operator": ">=",
+        "threshold": 1.1,
+        "passed": true
+      },
+      {
+        "code": "ltv",
+        "actual": null,
+        "operator": "<=",
+        "threshold": 70.0,
+        "passed": null
+      },
+      {
+        "code": "revenue_change",
+        "actual": 4.0,
+        "operator": ">",
+        "threshold": -20.0,
+        "passed": true
+      },
+      {
+        "code": "credit_history",
+        "actual": "good",
+        "operator": "!=",
+        "threshold": "weak",
+        "passed": true
+      }
+    ],
+    "route": "analyst_escalation",
+    "counter_offer_triggers": [
+      {
+        "code": "amount_limit_exceeded",
+        "triggered": true,
+        "recommended_action": "reduce_amount_to_limit",
+        "recommended_terms": {
+          "amount": 4000000,
+          "term_months": null,
+          "rate_delta_pp": null
+        }
+      }
+    ],
+    "auto_decline": null,
+    "ai_credit_memo": {
+      "summary": "Синтетический расчёт: необходима ручная проверка или изменение условий",
+      "key_risks": [
+        "amount_limit_exceeded"
+      ],
+      "recommendation": "counter_offer",
+      "generated_at": "2026-10-20T12:24:00Z"
+    },
+    "analyst_conclusion": null,
+    "created_at": "2026-10-20T12:24:00Z"
+  },
+  {
+    "assessment_id": "asm_01M5CM9FR0CNDSJ3JJS08BFZ05",
+    "application_id": "app_01M5CKC680SMH655H3WDDTTPM0",
+    "sequence": 1,
+    "status": "completed",
+    "trigger": "initial",
+    "policy_version": "2026.10_demo",
+    "model_version": "synthetic_rules_v0.1_not_ml",
+    "calculated_at": "2026-10-20T12:24:00Z",
+    "inputs": {
+      "loan_amount": 300000,
+      "term_months": 24,
+      "rate_pct": 22.0,
+      "annual_turnover": 3000000,
+      "ebitda": 800000,
+      "existing_debt_service_12m": 0,
+      "new_debt_service_12m": 186761,
+      "total_future_debt_service": 186761,
+      "collateral_market_value": null,
+      "collateral_haircut_pct": null,
+      "business_age_months": 6,
+      "revenue_change_pct": 0.0,
+      "cash_flow_negative_months": 0,
+      "credit_history_quality": "none"
+    },
+    "metrics": {
+      "dscr": 4.2835,
+      "ltv_pct": null,
+      "debt_burden_pct": 23.35
+    },
+    "ai_scoring": {
+      "risk_grade": "A",
+      "risk_score": 87,
+      "model_confidence_pct": 90.0
+    },
+    "stop_factor_checks": [
+      {
+        "code": "bankruptcy",
+        "group": "legal",
+        "triggered": false,
+        "actual": "none",
+        "source": "fns_data.bankruptcy_status"
+      },
+      {
+        "code": "observation_procedure",
+        "group": "legal",
+        "triggered": false,
+        "actual": "none",
+        "source": "fns_data.bankruptcy_status"
+      },
+      {
+        "code": "account_blocked_115fz",
+        "group": "legal",
+        "triggered": false,
+        "actual": false,
+        "source": "fns_data.has_account_block_115fz"
+      },
+      {
+        "code": "sanctions",
+        "group": "legal",
+        "triggered": false,
+        "actual": false,
+        "source": "compliance.sanctions_hit"
+      },
+      {
+        "code": "prohibited_activity",
+        "group": "legal",
+        "triggered": false,
+        "actual": false,
+        "source": "compliance.is_prohibited_activity"
+      },
+      {
+        "code": "cash_flow_negative_over_3m",
+        "group": "financial",
+        "triggered": false,
+        "actual": 0,
+        "source": "inputs.cash_flow_negative_months"
+      },
+      {
+        "code": "dscr_below_0_9",
+        "group": "financial",
+        "triggered": false,
+        "actual": 4.2835,
+        "source": "metrics.dscr"
+      },
+      {
+        "code": "mass_address",
+        "group": "fictitiousness",
+        "triggered": false,
+        "actual": false,
+        "source": "fns_data.is_mass_address"
+      },
+      {
+        "code": "mass_director",
+        "group": "fictitiousness",
+        "triggered": false,
+        "actual": false,
+        "source": "fns_data.is_mass_director"
+      },
+      {
+        "code": "no_tax_activity",
+        "group": "fictitiousness",
+        "triggered": false,
+        "actual": true,
+        "source": "fns_data.has_tax_activity"
+      }
+    ],
+    "escalation_checks": [
+      {
+        "code": "business_age_lt_12m",
+        "triggered": true,
+        "actual": 6,
+        "threshold": 12
+      },
+      {
+        "code": "model_confidence_lt_80",
+        "triggered": false,
+        "actual": 90.0,
+        "threshold": 80
+      },
+      {
+        "code": "conflicting_sources",
+        "triggered": false,
+        "actual": 0,
+        "threshold": 0
+      }
+    ],
+    "green_zone_checks": [
+      {
+        "code": "amount_limit",
+        "actual": 300000,
+        "operator": "<=",
+        "threshold": 600000.0,
+        "passed": true
+      },
+      {
+        "code": "dscr",
+        "actual": 4.2835,
+        "operator": ">=",
+        "threshold": 1.1,
+        "passed": true
+      },
+      {
+        "code": "ltv",
+        "actual": null,
+        "operator": "<=",
+        "threshold": 70.0,
+        "passed": null
+      },
+      {
+        "code": "revenue_change",
+        "actual": 0.0,
+        "operator": ">",
+        "threshold": -20.0,
+        "passed": true
+      },
+      {
+        "code": "credit_history",
+        "actual": "none",
+        "operator": "!=",
+        "threshold": "weak",
+        "passed": true
+      }
+    ],
+    "route": "analyst_escalation",
+    "counter_offer_triggers": [],
+    "auto_decline": null,
+    "ai_credit_memo": {
+      "summary": "Синтетический расчёт: необходима ручная проверка или изменение условий",
+      "key_risks": [
+        "business_age_lt_12m"
+      ],
+      "recommendation": "approve",
+      "generated_at": "2026-10-20T12:24:00Z"
+    },
+    "analyst_conclusion": null,
+    "created_at": "2026-10-20T12:24:00Z"
+  }
+]

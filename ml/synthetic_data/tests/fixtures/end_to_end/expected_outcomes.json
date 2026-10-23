@@ -1,0 +1,24 @@
+{
+  "ideal": {
+    "route": "green_zone",
+    "stop_factor": null,
+    "counter_trigger": null
+  },
+  "high_risk": {
+    "route": "auto_decline",
+    "stop_factor": "bankruptcy",
+    "counter_trigger": null
+  },
+  "borderline": {
+    "route": "analyst_escalation",
+    "stop_factor": null,
+    "counter_trigger": "amount_limit_exceeded",
+    "recommended_amount": 4000000
+  },
+  "new_business": {
+    "route": "analyst_escalation",
+    "stop_factor": null,
+    "escalation_trigger": "business_age_lt_12m",
+    "counter_trigger": null
+  }
+}

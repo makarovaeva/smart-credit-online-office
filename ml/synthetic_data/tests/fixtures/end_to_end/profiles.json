@@ -1,0 +1,442 @@
+[
+  {
+    "borrower_id": "brw_01M5CFYAM0SSCSWCET9EPWZEAV",
+    "status": "active",
+    "customer_since": "2026-10-19",
+    "company": {
+      "legal_form": "ooo",
+      "full_name": "Общество с ограниченной ответственностью «Меридиан»",
+      "short_name": "ООО «Меридиан»",
+      "inn": "7710000015",
+      "kpp": "770101001",
+      "ogrn": "1207710000013",
+      "registration_date": "2020-03-12",
+      "legal_address": "Тестовый адрес (вымышленный), Москва",
+      "actual_address": "Тестовый адрес (вымышленный), Москва",
+      "okved_main": {
+        "code": "62.01",
+        "name": "Разработка компьютерного программного обеспечения"
+      },
+      "tax_system": "usn_income_expense",
+      "employees_count": 12,
+      "region_code": "77"
+    },
+    "head": {
+      "full_name": "Петрова Анна Сергеевна",
+      "position": "Генеральный директор",
+      "inn_individual": "773000000169",
+      "birth_date": "1985-03-14",
+      "in_position_since": "2020-03-12",
+      "has_signing_authority": true
+    },
+    "owners": [
+      {
+        "owner_id": "own_01M5CFYAM0SSCSWCET9EPWZEAV",
+        "owner_type": "individual",
+        "name": "Петрова Анна Сергеевна",
+        "inn": "773000000169",
+        "ownership_share_pct": 100.0,
+        "is_beneficiary": true,
+        "has_signing_authority": true
+      }
+    ],
+    "contacts": {
+      "phone": "+70000000000",
+      "email": "ideal@example.invalid",
+      "contact_person": {
+        "full_name": "Петрова Анна Сергеевна",
+        "position": "Генеральный директор",
+        "phone": "+70000000000"
+      }
+    },
+    "fns_data": {
+      "retrieved_at": "2026-10-20T10:07:12Z",
+      "egrul_status": "active",
+      "bankruptcy_status": "none",
+      "has_account_block_115fz": false,
+      "is_mass_address": false,
+      "is_mass_director": false,
+      "has_tax_activity": true,
+      "tax_arrears_amount": 0
+    },
+    "compliance": {
+      "checked_at": "2026-10-20T10:07:40Z",
+      "source": "internal_screening",
+      "sanctions_hit": false,
+      "is_prohibited_activity": false
+    },
+    "bki_data": {
+      "retrieved_at": "2026-10-20T10:08:05Z",
+      "bureau": "Синтетическое БКИ",
+      "credit_history_quality": "good",
+      "active_loans_count": 0,
+      "total_debt_amount": 0,
+      "monthly_debt_service": 0,
+      "overdue_amount": 0,
+      "max_overdue_days_12m": 0
+    },
+    "financials": {
+      "as_of_date": "2026-09-30",
+      "annual_turnover": 30000000,
+      "revenue_change_pct": 5.0,
+      "ebitda": 8000000,
+      "cash_flow_period_end": "2026-09",
+      "cash_flow_last_12m": [
+        250000,
+        250000,
+        250000,
+        250000,
+        250000,
+        250000,
+        250000,
+        250000,
+        250000,
+        250000,
+        250000,
+        250000
+      ],
+      "source": "bank_statements"
+    },
+    "bank_account": {
+      "account_number": "40702810000000000001",
+      "bik": "044525000",
+      "bank_name": "[наименование банка]",
+      "currency": "RUB",
+      "opened_at": "2020-07-01",
+      "status": "active"
+    },
+    "documents": [],
+    "created_at": "2026-10-19T08:00:00Z",
+    "updated_at": "2026-10-20T11:08:00Z"
+  },
+  {
+    "borrower_id": "brw_01M5CFYAM0YF4BY30B3ACN6FKH",
+    "status": "active",
+    "customer_since": "2026-10-19",
+    "company": {
+      "legal_form": "ooo",
+      "full_name": "Общество с ограниченной ответственностью «Шторм»",
+      "short_name": "ООО «Шторм»",
+      "inn": "7710000022",
+      "kpp": "770101001",
+      "ogrn": "1197710000025",
+      "registration_date": "2019-06-10",
+      "legal_address": "Тестовый адрес (вымышленный), Москва",
+      "actual_address": "Тестовый адрес (вымышленный), Москва",
+      "okved_main": {
+        "code": "62.01",
+        "name": "Разработка компьютерного программного обеспечения"
+      },
+      "tax_system": "usn_income_expense",
+      "employees_count": 8,
+      "region_code": "77"
+    },
+    "head": {
+      "full_name": "Соколов Михаил Андреевич",
+      "position": "Генеральный директор",
+      "inn_individual": "773000000232",
+      "birth_date": "1985-03-14",
+      "in_position_since": "2019-06-10",
+      "has_signing_authority": true
+    },
+    "owners": [
+      {
+        "owner_id": "own_01M5CFYAM0YF4BY30B3ACN6FKH",
+        "owner_type": "individual",
+        "name": "Соколов Михаил Андреевич",
+        "inn": "773000000232",
+        "ownership_share_pct": 100.0,
+        "is_beneficiary": true,
+        "has_signing_authority": true
+      }
+    ],
+    "contacts": {
+      "phone": "+70000000000",
+      "email": "high_risk@example.invalid",
+      "contact_person": {
+        "full_name": "Соколов Михаил Андреевич",
+        "position": "Генеральный директор",
+        "phone": "+70000000000"
+      }
+    },
+    "fns_data": {
+      "retrieved_at": "2026-10-20T10:07:12Z",
+      "egrul_status": "active",
+      "bankruptcy_status": "bankruptcy",
+      "has_account_block_115fz": false,
+      "is_mass_address": false,
+      "is_mass_director": false,
+      "has_tax_activity": true,
+      "tax_arrears_amount": 250000
+    },
+    "compliance": {
+      "checked_at": "2026-10-20T10:07:40Z",
+      "source": "internal_screening",
+      "sanctions_hit": false,
+      "is_prohibited_activity": false
+    },
+    "bki_data": {
+      "retrieved_at": "2026-10-20T10:08:05Z",
+      "bureau": "Синтетическое БКИ",
+      "credit_history_quality": "weak",
+      "active_loans_count": 1,
+      "total_debt_amount": 1600000,
+      "monthly_debt_service": 60000,
+      "overdue_amount": 100000,
+      "max_overdue_days_12m": 45
+    },
+    "financials": {
+      "as_of_date": "2026-09-30",
+      "annual_turnover": 8000000,
+      "revenue_change_pct": -25.0,
+      "ebitda": -200000,
+      "cash_flow_period_end": "2026-09",
+      "cash_flow_last_12m": [
+        -80000,
+        -80000,
+        -80000,
+        -80000,
+        -80000,
+        100000,
+        100000,
+        100000,
+        100000,
+        100000,
+        100000,
+        100000
+      ],
+      "source": "bank_statements"
+    },
+    "bank_account": {
+      "account_number": "40702810000000000002",
+      "bik": "044525000",
+      "bank_name": "[наименование банка]",
+      "currency": "RUB",
+      "opened_at": "2020-07-01",
+      "status": "active"
+    },
+    "documents": [],
+    "created_at": "2026-10-19T08:00:00Z",
+    "updated_at": "2026-10-20T11:08:00Z"
+  },
+  {
+    "borrower_id": "brw_01M5CFYAM0494B0HECWRMDEXJ3",
+    "status": "active",
+    "customer_since": "2026-10-19",
+    "company": {
+      "legal_form": "ooo",
+      "full_name": "Общество с ограниченной ответственностью «Рубеж»",
+      "short_name": "ООО «Рубеж»",
+      "inn": "7710000030",
+      "kpp": "770101001",
+      "ogrn": "1187710000037",
+      "registration_date": "2018-02-05",
+      "legal_address": "Тестовый адрес (вымышленный), Москва",
+      "actual_address": "Тестовый адрес (вымышленный), Москва",
+      "okved_main": {
+        "code": "62.01",
+        "name": "Разработка компьютерного программного обеспечения"
+      },
+      "tax_system": "usn_income_expense",
+      "employees_count": 23,
+      "region_code": "77"
+    },
+    "head": {
+      "full_name": "Зайцев Павел Сергеевич",
+      "position": "Генеральный директор",
+      "inn_individual": "773000000306",
+      "birth_date": "1985-03-14",
+      "in_position_since": "2018-02-05",
+      "has_signing_authority": true
+    },
+    "owners": [
+      {
+        "owner_id": "own_01M5CFYAM0494B0HECWRMDEXJ3",
+        "owner_type": "individual",
+        "name": "Зайцев Павел Сергеевич",
+        "inn": "773000000306",
+        "ownership_share_pct": 100.0,
+        "is_beneficiary": true,
+        "has_signing_authority": true
+      }
+    ],
+    "contacts": {
+      "phone": "+70000000000",
+      "email": "borderline@example.invalid",
+      "contact_person": {
+        "full_name": "Зайцев Павел Сергеевич",
+        "position": "Генеральный директор",
+        "phone": "+70000000000"
+      }
+    },
+    "fns_data": {
+      "retrieved_at": "2026-10-20T10:07:12Z",
+      "egrul_status": "active",
+      "bankruptcy_status": "none",
+      "has_account_block_115fz": false,
+      "is_mass_address": false,
+      "is_mass_director": false,
+      "has_tax_activity": true,
+      "tax_arrears_amount": 0
+    },
+    "compliance": {
+      "checked_at": "2026-10-20T10:07:40Z",
+      "source": "internal_screening",
+      "sanctions_hit": false,
+      "is_prohibited_activity": false
+    },
+    "bki_data": {
+      "retrieved_at": "2026-10-20T10:08:05Z",
+      "bureau": "Синтетическое БКИ",
+      "credit_history_quality": "good",
+      "active_loans_count": 0,
+      "total_debt_amount": 0,
+      "monthly_debt_service": 0,
+      "overdue_amount": 0,
+      "max_overdue_days_12m": 0
+    },
+    "financials": {
+      "as_of_date": "2026-09-30",
+      "annual_turnover": 20000000,
+      "revenue_change_pct": 4.0,
+      "ebitda": 9000000,
+      "cash_flow_period_end": "2026-09",
+      "cash_flow_last_12m": [
+        250000,
+        250000,
+        250000,
+        250000,
+        250000,
+        250000,
+        250000,
+        250000,
+        250000,
+        250000,
+        250000,
+        250000
+      ],
+      "source": "bank_statements"
+    },
+    "bank_account": {
+      "account_number": "40702810000000000003",
+      "bik": "044525000",
+      "bank_name": "[наименование банка]",
+      "currency": "RUB",
+      "opened_at": "2020-07-01",
+      "status": "active"
+    },
+    "documents": [],
+    "created_at": "2026-10-19T08:00:00Z",
+    "updated_at": "2026-10-20T11:08:00Z"
+  },
+  {
+    "borrower_id": "brw_01M5CFYAM0SMH655H3WDDTTPM0",
+    "status": "active",
+    "customer_since": "2026-10-19",
+    "company": {
+      "legal_form": "ip",
+      "full_name": "Индивидуальный предприниматель Орлова Екатерина Павловна",
+      "short_name": "ИП Орлова Екатерина Павловна",
+      "inn": "773000000480",
+      "kpp": null,
+      "ogrn": "326771000000045",
+      "registration_date": "2026-04-01",
+      "legal_address": "Тестовый адрес (вымышленный), Москва",
+      "actual_address": "Тестовый адрес (вымышленный), Москва",
+      "okved_main": {
+        "code": "62.01",
+        "name": "Разработка компьютерного программного обеспечения"
+      },
+      "tax_system": "usn_income_expense",
+      "employees_count": 2,
+      "region_code": "77"
+    },
+    "head": {
+      "full_name": "Орлова Екатерина Павловна",
+      "position": "Индивидуальный предприниматель",
+      "inn_individual": "773000000480",
+      "birth_date": "1985-03-14",
+      "in_position_since": "2026-04-01",
+      "has_signing_authority": true
+    },
+    "owners": [
+      {
+        "owner_id": "own_01M5CFYAM0SMH655H3WDDTTPM0",
+        "owner_type": "individual",
+        "name": "Орлова Екатерина Павловна",
+        "inn": "773000000480",
+        "ownership_share_pct": 100.0,
+        "is_beneficiary": true,
+        "has_signing_authority": true
+      }
+    ],
+    "contacts": {
+      "phone": "+70000000000",
+      "email": "new_business@example.invalid",
+      "contact_person": {
+        "full_name": "Орлова Екатерина Павловна",
+        "position": "Индивидуальный предприниматель",
+        "phone": "+70000000000"
+      }
+    },
+    "fns_data": {
+      "retrieved_at": "2026-10-20T10:07:12Z",
+      "egrul_status": "active",
+      "bankruptcy_status": "none",
+      "has_account_block_115fz": false,
+      "is_mass_address": false,
+      "is_mass_director": false,
+      "has_tax_activity": true,
+      "tax_arrears_amount": 0
+    },
+    "compliance": {
+      "checked_at": "2026-10-20T10:07:40Z",
+      "source": "internal_screening",
+      "sanctions_hit": false,
+      "is_prohibited_activity": false
+    },
+    "bki_data": {
+      "retrieved_at": "2026-10-20T10:08:05Z",
+      "bureau": "Синтетическое БКИ",
+      "credit_history_quality": "none",
+      "active_loans_count": 0,
+      "total_debt_amount": 0,
+      "monthly_debt_service": 0,
+      "overdue_amount": 0,
+      "max_overdue_days_12m": 0
+    },
+    "financials": {
+      "as_of_date": "2026-09-30",
+      "annual_turnover": 3000000,
+      "revenue_change_pct": 0.0,
+      "ebitda": 800000,
+      "cash_flow_period_end": "2026-09",
+      "cash_flow_last_12m": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        50000,
+        50000,
+        50000,
+        50000,
+        50000,
+        50000
+      ],
+      "source": "bank_statements"
+    },
+    "bank_account": {
+      "account_number": "40702810000000000004",
+      "bik": "044525000",
+      "bank_name": "[наименование банка]",
+      "currency": "RUB",
+      "opened_at": "2026-04-10",
+      "status": "active"
+    },
+    "documents": [],
+    "created_at": "2026-10-19T08:00:00Z",
+    "updated_at": "2026-10-20T11:08:00Z"
+  }
+]
