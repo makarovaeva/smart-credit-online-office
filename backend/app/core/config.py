@@ -14,6 +14,20 @@ class Settings(BaseSettings):
 
     cors_origins: list[str] = ["http://localhost:3000"]
 
+    # Для локального запуска и тестов; в docker-compose задаётся через окружение
+    jwt_secret: str = "dev-secret-change-me"
+    access_token_ttl_minutes: int = 12 * 60
+
+    # Датасет синтетических заёмщиков от ML (.jsonl или .json) - из него отвечают моки ЕГРЮЛ,
+    # ФНС и БКИ. ИНН, которых в датасете нет, генерируются на лету
+    borrower_dataset_path: str | None = None
+
+    # Реализация скоринга из services/scoring.py; модель ML подключается сюда
+    scoring_model: str = "rules"
+
+    # Срок действия оффера на доске не задан - открытый вопрос
+    offer_validity_days: int = 30
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -1,24 +1,35 @@
-FROM python:3.12-slim AS base
+# Версии зафиксированы: базовый образ - точный тег, зависимости - uv.lock
+ARG PYTHON_IMAGE=python:3.12.15-slim
+
+FROM ${PYTHON_IMAGE} AS builder
+
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_PROJECT_ENVIRONMENT=/opt/venv
+
+# uv из PyPI, а не из ghcr.io: сборка не зависит от доступа к GitHub Container Registry
+RUN pip install --no-cache-dir uv==0.13.5
+
+WORKDIR /app
+COPY pyproject.toml uv.lock ./
+# --locked: сборка падает, если uv.lock отстал от pyproject.toml
+RUN uv sync --locked --no-dev --no-install-project
+
+
+FROM ${PYTHON_IMAGE} AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy \
-    UV_PROJECT_ENVIRONMENT=/opt/venv \
     PATH="/opt/venv/bin:$PATH"
 
-COPY --from=ghcr.io/astral-sh/uv:0.13.4 /uv /usr/local/bin/uv
-
+RUN useradd --create-home --uid 1000 app
 WORKDIR /app
 
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+COPY --from=builder /opt/venv /opt/venv
+COPY --chown=app:app . .
 
-COPY . .
-
-RUN useradd --create-home --uid 1000 app && chown -R app /app
 USER app
-
 EXPOSE 8000
 
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "scripts/entrypoint.sh"]

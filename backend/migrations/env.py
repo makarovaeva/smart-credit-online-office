@@ -1,7 +1,9 @@
 import asyncio
 from logging.config import fileConfig
+from typing import Any, Literal
 
 from alembic import context
+from alembic.autogenerate.api import AutogenContext
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -16,10 +18,21 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def render_item(
+    type_: str, obj: Any, autogen_context: AutogenContext
+) -> str | None | Literal[False]:
+    # CHECK от non-native Enum создаётся самим типом (create_constraint=True). Alembic 1.20
+    # не распознаёт такие CHECK на SQLAlchemy 2.1 и рендерит их повторно - пропускаем.
+    if type_ == "check" and getattr(obj, "_type_bound", False):
+        return None
+    return False
+
+
 def run_migrations_offline() -> None:
     context.configure(
         url=get_settings().database_url,
         target_metadata=target_metadata,
+        render_item=render_item,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
@@ -28,7 +41,9 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(
+        connection=connection, target_metadata=target_metadata, render_item=render_item
+    )
     with context.begin_transaction():
         context.run_migrations()
 
