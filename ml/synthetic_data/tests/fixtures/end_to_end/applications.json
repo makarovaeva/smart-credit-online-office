@@ -1,0 +1,178 @@
+[
+  {
+    "application_id": "app_01M5CKC680SSCSWCET9EPWZEAV",
+    "application_number": "ММБ-2026-TEST-01",
+    "borrower_id": "brw_01M5CFYAM0SSCSWCET9EPWZEAV",
+    "status": "application_submitted",
+    "status_changed_at": "2026-10-20T12:23:00Z",
+    "routing_status": "not_routed",
+    "current_assessment_id": null,
+    "loan_request": {
+      "amount": 2000000,
+      "currency": "RUB",
+      "term_months": 24,
+      "repayment_type": "annuity"
+    },
+    "purpose": {
+      "category": "working_capital",
+      "description": "Пополнение оборотных средств"
+    },
+    "collateral": {
+      "type": "none",
+      "description": null,
+      "market_value": null,
+      "haircut_pct": null,
+      "valuation_source": null
+    },
+    "pre_approval": {
+      "max_amount": 5000000,
+      "indicative_rate_pct": 22.0,
+      "calculated_at": "2026-10-20T12:15:00Z"
+    },
+    "consents": {
+      "data_processing_at": "2026-10-20T12:08:00Z",
+      "credit_history_check_at": "2026-10-20T12:10:00Z",
+      "submit_confirmed_at": "2026-10-20T12:23:00Z"
+    },
+    "document_requirements": [],
+    "assignment": {
+      "analyst_user_id": null,
+      "underwriter_user_id": null
+    },
+    "closure": null,
+    "created_at": "2026-10-20T12:08:00Z",
+    "updated_at": "2026-10-20T12:23:00Z"
+  },
+  {
+    "application_id": "app_01M5CKC680YF4BY30B3ACN6FKH",
+    "application_number": "ММБ-2026-TEST-02",
+    "borrower_id": "brw_01M5CFYAM0YF4BY30B3ACN6FKH",
+    "status": "application_submitted",
+    "status_changed_at": "2026-10-20T12:23:00Z",
+    "routing_status": "not_routed",
+    "current_assessment_id": null,
+    "loan_request": {
+      "amount": 1000000,
+      "currency": "RUB",
+      "term_months": 24,
+      "repayment_type": "annuity"
+    },
+    "purpose": {
+      "category": "working_capital",
+      "description": "Пополнение оборотных средств"
+    },
+    "collateral": {
+      "type": "none",
+      "description": null,
+      "market_value": null,
+      "haircut_pct": null,
+      "valuation_source": null
+    },
+    "pre_approval": {
+      "max_amount": 1600000,
+      "indicative_rate_pct": 22.0,
+      "calculated_at": "2026-10-20T12:15:00Z"
+    },
+    "consents": {
+      "data_processing_at": "2026-10-20T12:08:00Z",
+      "credit_history_check_at": "2026-10-20T12:10:00Z",
+      "submit_confirmed_at": "2026-10-20T12:23:00Z"
+    },
+    "document_requirements": [],
+    "assignment": {
+      "analyst_user_id": null,
+      "underwriter_user_id": null
+    },
+    "closure": null,
+    "created_at": "2026-10-20T12:08:00Z",
+    "updated_at": "2026-10-20T12:23:00Z"
+  },
+  {
+    "application_id": "app_01M5CKC680494B0HECWRMDEXJ3",
+    "application_number": "ММБ-2026-TEST-03",
+    "borrower_id": "brw_01M5CFYAM0494B0HECWRMDEXJ3",
+    "status": "application_submitted",
+    "status_changed_at": "2026-10-20T12:23:00Z",
+    "routing_status": "not_routed",
+    "current_assessment_id": null,
+    "loan_request": {
+      "amount": 4500000,
+      "currency": "RUB",
+      "term_months": 24,
+      "repayment_type": "annuity"
+    },
+    "purpose": {
+      "category": "working_capital",
+      "description": "Пополнение оборотных средств"
+    },
+    "collateral": {
+      "type": "none",
+      "description": null,
+      "market_value": null,
+      "haircut_pct": null,
+      "valuation_source": null
+    },
+    "pre_approval": {
+      "max_amount": 4000000,
+      "indicative_rate_pct": 22.0,
+      "calculated_at": "2026-10-20T12:15:00Z"
+    },
+    "consents": {
+      "data_processing_at": "2026-10-20T12:08:00Z",
+      "credit_history_check_at": "2026-10-20T12:10:00Z",
+      "submit_confirmed_at": "2026-10-20T12:23:00Z"
+    },
+    "document_requirements": [],
+    "assignment": {
+      "analyst_user_id": null,
+      "underwriter_user_id": null
+    },
+    "closure": null,
+    "created_at": "2026-10-20T12:08:00Z",
+    "updated_at": "2026-10-20T12:23:00Z"
+  },
+  {
+    "application_id": "app_01M5CKC680SMH655H3WDDTTPM0",
+    "application_number": "ММБ-2026-TEST-04",
+    "borrower_id": "brw_01M5CFYAM0SMH655H3WDDTTPM0",
+    "status": "application_submitted",
+    "status_changed_at": "2026-10-20T12:23:00Z",
+    "routing_status": "not_routed",
+    "current_assessment_id": null,
+    "loan_request": {
+      "amount": 300000,
+      "currency": "RUB",
+      "term_months": 24,
+      "repayment_type": "annuity"
+    },
+    "purpose": {
+      "category": "working_capital",
+      "description": "Пополнение оборотных средств"
+    },
+    "collateral": {
+      "type": "none",
+      "description": null,
+      "market_value": null,
+      "haircut_pct": null,
+      "valuation_source": null
+    },
+    "pre_approval": {
+      "max_amount": 600000,
+      "indicative_rate_pct": 22.0,
+      "calculated_at": "2026-10-20T12:15:00Z"
+    },
+    "consents": {
+      "data_processing_at": "2026-10-20T12:08:00Z",
+      "credit_history_check_at": "2026-10-20T12:10:00Z",
+      "submit_confirmed_at": "2026-10-20T12:23:00Z"
+    },
+    "document_requirements": [],
+    "assignment": {
+      "analyst_user_id": null,
+      "underwriter_user_id": null
+    },
+    "closure": null,
+    "created_at": "2026-10-20T12:08:00Z",
+    "updated_at": "2026-10-20T12:23:00Z"
+  }
+]

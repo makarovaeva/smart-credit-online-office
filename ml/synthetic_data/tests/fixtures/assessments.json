@@ -1,0 +1,181 @@
+[
+  {
+    "assessment_id": "asm_01JC0B2X9F",
+    "application_id": "app_01JC0A7Q5R",
+    "sequence": 2,
+    "status": "completed",
+    "trigger": "more_information_received",
+    "policy_version": "2026.10",
+    "model_version": "risk-llm-1.4.2",
+    "calculated_at": "2026-10-21T12:17:00Z",
+    "inputs": {
+      "loan_amount": 3000000,
+      "term_months": 24,
+      "rate_pct": 22.0,
+      "annual_turnover": 18000000,
+      "ebitda": 5000000,
+      "existing_debt_service_12m": 480000,
+      "new_debt_service_12m": 1867620,
+      "total_future_debt_service": 2347620,
+      "collateral_market_value": null,
+      "collateral_haircut_pct": null,
+      "business_age_months": 54,
+      "revenue_change_pct": -4.2,
+      "cash_flow_negative_months": 0,
+      "credit_history_quality": "good"
+    },
+    "metrics": {
+      "dscr": 2.13,
+      "ltv_pct": null,
+      "debt_burden_pct": 46.95
+    },
+    "ai_scoring": {
+      "risk_grade": "B",
+      "risk_score": 72,
+      "model_confidence_pct": 91.0
+    },
+    "stop_factor_checks": [
+      {
+        "code": "bankruptcy",
+        "group": "legal",
+        "triggered": false,
+        "actual": "none",
+        "source": "fns_data.bankruptcy_status"
+      },
+      {
+        "code": "observation_procedure",
+        "group": "legal",
+        "triggered": false,
+        "actual": "none",
+        "source": "fns_data.bankruptcy_status"
+      },
+      {
+        "code": "account_blocked_115fz",
+        "group": "legal",
+        "triggered": false,
+        "actual": false,
+        "source": "fns_data.has_account_block_115fz"
+      },
+      {
+        "code": "sanctions",
+        "group": "legal",
+        "triggered": false,
+        "actual": false,
+        "source": "compliance.sanctions_hit"
+      },
+      {
+        "code": "prohibited_activity",
+        "group": "legal",
+        "triggered": false,
+        "actual": false,
+        "source": "compliance.is_prohibited_activity"
+      },
+      {
+        "code": "cash_flow_negative_over_3m",
+        "group": "financial",
+        "triggered": false,
+        "actual": 0,
+        "source": "inputs.cash_flow_negative_months"
+      },
+      {
+        "code": "dscr_below_0_9",
+        "group": "financial",
+        "triggered": false,
+        "actual": 2.13,
+        "source": "metrics.dscr"
+      },
+      {
+        "code": "mass_address",
+        "group": "fictitiousness",
+        "triggered": false,
+        "actual": false,
+        "source": "fns_data.is_mass_address"
+      },
+      {
+        "code": "mass_director",
+        "group": "fictitiousness",
+        "triggered": false,
+        "actual": false,
+        "source": "fns_data.is_mass_director"
+      },
+      {
+        "code": "no_tax_activity",
+        "group": "fictitiousness",
+        "triggered": false,
+        "actual": false,
+        "source": "fns_data.has_tax_activity"
+      }
+    ],
+    "escalation_checks": [
+      {
+        "code": "business_age_lt_12m",
+        "triggered": false,
+        "actual": 54,
+        "threshold": 12
+      },
+      {
+        "code": "model_confidence_lt_80",
+        "triggered": false,
+        "actual": 91.0,
+        "threshold": 80
+      },
+      {
+        "code": "conflicting_sources",
+        "triggered": false,
+        "actual": 0,
+        "threshold": 0
+      }
+    ],
+    "green_zone_checks": [
+      {
+        "code": "amount_limit",
+        "actual": 3000000,
+        "operator": "<=",
+        "threshold": 3600000,
+        "passed": true
+      },
+      {
+        "code": "dscr",
+        "actual": 2.13,
+        "operator": ">=",
+        "threshold": 1.1,
+        "passed": true
+      },
+      {
+        "code": "ltv",
+        "actual": null,
+        "operator": "<=",
+        "threshold": 70,
+        "passed": null
+      },
+      {
+        "code": "revenue_change",
+        "actual": -4.2,
+        "operator": ">",
+        "threshold": -20,
+        "passed": true
+      },
+      {
+        "code": "credit_history",
+        "actual": "good",
+        "operator": "!=",
+        "threshold": "weak",
+        "passed": true
+      }
+    ],
+    "route": "green_zone",
+    "counter_offer_triggers": [],
+    "auto_decline": null,
+    "ai_credit_memo": {
+      "summary": "Устойчивый бизнес с положительным денежным потоком. Запрошенная сумма ниже лимита автоодобрения, DSCR выше порога.",
+      "key_risks": [
+        "Небольшое снижение выручки (-4,2 %)",
+        "Концентрация выручки на нескольких контрагентах"
+      ],
+      "recommendation": "approve",
+      "generated_at": "2026-10-21T12:25:00Z"
+    },
+    "analyst_conclusion": null,
+    "created_at": "2026-10-21T12:15:00Z"
+  }
+]
