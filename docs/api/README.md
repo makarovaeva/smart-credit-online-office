@@ -1,6 +1,8 @@
 # API v1 (черновик)
 
-Спецификация: [`openapi.json`](openapi.json). Swagger UI — http://localhost:8000/docs.
+Спецификация: [`openapi.json`](openapi.json) и [`openapi.yaml`](openapi.yaml) (OpenAPI 3.1). Swagger UI — http://localhost:8000/docs, ReDoc — http://localhost:8000/redoc.
+
+Postman-коллекция с примерами запросов и сквозными сценариями — [`../postman/`](../postman/README.md).
 
 Реализованы:
 - вход клиента и сотрудника;
@@ -19,7 +21,7 @@
 cd backend && uv run python -m scripts.export_openapi
 ```
 
-Тест `tests/test_openapi.py` падает, если `openapi.json` отстал от кода.
+Тест `tests/test_openapi.py` падает, если `openapi.json` или `openapi.yaml` отстали от кода, а также если спека не проходит валидацию (`openapi-spec-validator`).
 
 ## Соглашения
 
