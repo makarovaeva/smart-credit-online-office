@@ -47,6 +47,8 @@ CLIENT_ACTIONS: dict[ApplicationStatus, list[ApplicationAction]] = {
     S.NEED_ADDITIONAL_DATA: [A.EDIT, A.UPLOAD_DOCUMENTS, A.ANSWER_INFO_REQUEST],
     S.OFFER_GENERATED: [A.ACCEPT_OFFER, A.REJECT_OFFER],
     S.E_SIGN: [A.SIGN],
+    # Подписано, но выдача прервалась - повторный sign её доводит
+    S.DISBURSEMENT: [A.SIGN],
 }
 
 # Параметры кредита меняются только до подачи; по дозапросу - финансы и залог

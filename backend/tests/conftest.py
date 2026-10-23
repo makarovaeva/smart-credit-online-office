@@ -157,3 +157,22 @@ async def product(session: AsyncSession) -> CreditProduct:
     session.add(product)
     await session.flush()
     return product
+
+
+@pytest.fixture
+def draft_body(company: Company, product: CreditProduct) -> dict:
+    return {
+        "company_id": str(company.id),
+        "product_id": str(product.id),
+        "requested_amount": "3000000.00",
+        "requested_term_months": 36,
+        "purpose": "working_capital",
+        "annual_revenue": "30000000.00",
+    }
+
+
+@pytest.fixture
+async def draft(api: AsyncClient, client_user: User, draft_body: dict) -> dict:
+    response = await api.post("/api/v1/applications", json=draft_body, headers=auth(client_user))
+    assert response.status_code == 201, response.text
+    return response.json()

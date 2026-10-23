@@ -18,6 +18,7 @@ from app.schemas.decision import (
     ScoringResultRead,
 )
 from app.schemas.document import DocumentRead, InfoRequestRead
+from app.schemas.loan import LoanContractRead
 
 
 class BackofficeApplicationItem(ApplicationShort):
@@ -41,6 +42,7 @@ class BackofficeApplicationDetail(BaseModel):
     scoring: ScoringResultRead | None
     credit_memo: CreditMemoRead | None
     decisions: list[DecisionRead]
+    contract: LoanContractRead | None
     info_requests: list[InfoRequestRead]
     documents: list[DocumentRead]
     history: list[StatusHistoryItem]

@@ -35,7 +35,11 @@ cd backend && uv run python -m scripts.export_openapi
   - Администратор видит все заявки.
 - Ошибки бизнес-правил: `422` — данные не проходят правила (лимиты продукта, не все согласия, нет данных залога, у решения андеррайтера не хватает полей), `409` — действие недопустимо в текущем статусе.
 - `PATCH /applications/{id}`: сумма, срок, цель и продукт меняются только в `draft` / `pre_approved`; финансовые показатели и залог — ещё и в `need_additional_data`. Нужна текущая `version`, иначе `409`. Если `has_collateral=false`, поля залога очищаются.
-- Принятие оффера, подписание и выдача — симуляция. `offer/accept` сразу доводит заявку до `e_sign`, `sign` — до `completed`; код подтверждения не сверяется.
+- Принятие оффера, подписание и выдача — симуляция.
+  - `offer/accept` готовит договор с графиком и доводит заявку до `e_sign`.
+  - `sign` подписывает, открывает ссудный счёт, зачисляет средства и доводит заявку до `completed`. Код подтверждения не сверяется.
+  - Повторные вызовы идемпотентны и возвращают текущее состояние. Прерванную выдачу доводит повторный `sign`.
+  - Подробно — [`../application-lifecycle.md`](../application-lifecycle.md#договор-и-выдача-симуляция).
 - Ошибки: `{"detail": "..."}`. `404` — нет объекта или нет доступа к нему (не раскрываем существование чужих заявок), `409` — действие недопустимо в текущем статусе или устарела `version`, `422` — ошибка валидации.
 - Деньги — строкой (`"1500000.00"`), даты — ISO 8601 с таймзоной.
 - Списки — `limit`/`offset`, ответ `{items, total, limit, offset}`.
@@ -67,7 +71,9 @@ cd backend && uv run python -m scripts.export_openapi
 | POST | `/applications/{id}/info-requests/{rid}/answer` | Ответить: `need_additional_data → ai_verification` (дозапрос ИИ) или `→ underwriter_review` (дозапрос андеррайтера) |
 | GET | `/applications/{id}/offer` | Оффер или контр-предложение (`decision_type=conditional_approval`) |
 | POST | `/applications/{id}/offer/accept`, `/reject` | Принять / отказаться от оффера |
-| POST | `/applications/{id}/sign` | Подписание (симуляция): `e_sign → disbursement → completed` |
+| POST | `/applications/{id}/sign` | Подписание и выдача (симуляция): `e_sign → disbursement → completed` |
+| GET | `/applications/{id}/contract` | Кредитный договор и график платежей (после принятия оффера) |
+| GET | `/loans`, `/loans/{id}` | Раздел «Кредиты»: договоры с остатком долга, ближайшим платежом и графиком |
 | GET | `/notifications`, POST `/notifications/{id}/read` | Уведомления в кабинете |
 
 ### Банк

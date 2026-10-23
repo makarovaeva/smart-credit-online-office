@@ -24,6 +24,9 @@ erDiagram
     applications ||--o{ credit_decisions : ""
     users ||--o{ notifications : ""
     applications ||--o{ notifications : ""
+    applications ||--o| loan_contracts : ""
+    credit_decisions ||--o| loan_contracts : "принятый оффер"
+    loan_contracts ||--o{ payment_schedule_items : ""
 
     users {
         uuid id PK
@@ -139,6 +142,26 @@ erDiagram
         jsonb conditions
         string client_response "accepted | rejected"
     }
+    loan_contracts {
+        string contract_number UK "КД-2026-000045"
+        string status "awaiting_signature | signed | active | overdue | closed"
+        numeric principal_amount
+        int term_months
+        numeric interest_rate
+        numeric monthly_payment
+        date maturity_date
+        string loan_account_number UK
+        string settlement_account_number
+        timestamp disbursed_at
+    }
+    payment_schedule_items {
+        int installment_no
+        date due_date
+        numeric principal_amount
+        numeric interest_amount
+        numeric balance_after
+        string status "scheduled | paid | overdue"
+    }
     notifications {
         string type
         string title
@@ -173,4 +196,6 @@ erDiagram
 | `application_status_history` | Аудит (кто, когда, почему изменил статус) и таймлайн в кабинете клиента |
 | `applications.version` | Оптимистичная блокировка: клиент и сотрудники банка не перезаписывают изменения друг друга |
 | Файлы — только метаданные в БД, содержимое в объектном хранилище (`storage_key`) | БД не раздувается бинарными данными |
+| `loan_contracts` уникален по заявке и по решению андеррайтера | Договор — снимок условий принятого оффера; уникальность делает подготовку договора и выдачу идемпотентными |
+| `payment_schedule_items` отдельной таблицей | Строки графика с плановыми и фактическими статусами платежей; остаток и ближайший платёж считаются из них |
 | `notifications` | Сценарий по условиям кейса проходит внутри продукта, без email/SMS |

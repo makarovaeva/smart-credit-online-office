@@ -237,3 +237,25 @@ class CounterOfferScenario(StrEnum):
     DEBT_BURDEN_AMOUNT_REDUCTION = "debt_burden_amount_reduction"
     LTV_AMOUNT_REDUCTION = "ltv_amount_reduction"
     RISK_PREMIUM = "risk_premium"
+
+
+class LoanContractStatus(StrEnum):
+    """Статус кредитного договора (раздел «Кредиты»)."""
+
+    AWAITING_SIGNATURE = "awaiting_signature"
+    SIGNED = "signed"
+    # Средства выданы, кредит обслуживается
+    ACTIVE = "active"
+    OVERDUE = "overdue"
+    CLOSED = "closed"
+
+
+class RepaymentType(StrEnum):
+    ANNUITY = "annuity"
+    DIFFERENTIATED = "differentiated"
+
+
+class PaymentStatus(StrEnum):
+    SCHEDULED = "scheduled"
+    PAID = "paid"
+    OVERDUE = "overdue"

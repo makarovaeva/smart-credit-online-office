@@ -35,6 +35,7 @@ from app.schemas.document import DocumentRead, InfoRequestRead
 from app.services.applications import to_read
 from app.services.assignment import STAGE_ROLES
 from app.services.errors import ConflictError, ForbiddenError, NotFoundError, ValidationFailedError
+from app.services.loans import get_contract, to_contract_read
 from app.services.offers import to_decision_read
 
 
@@ -140,6 +141,7 @@ async def get_detail(
     pre_approvals = await _all(session, PreApproval, application.id)
     scorings = await _all(session, ScoringResult, application.id)
     memos = await _all(session, CreditMemo, application.id)
+    contract = await get_contract(session, application.id)
 
     return BackofficeApplicationDetail(
         application=await to_read(session, application),
@@ -160,6 +162,7 @@ async def get_detail(
         decisions=[
             to_decision_read(d) for d in await _all(session, CreditDecision, application.id)
         ],
+        contract=await to_contract_read(session, contract) if contract else None,
         info_requests=[
             InfoRequestRead.model_validate(r)
             for r in await _all(session, InfoRequest, application.id)
