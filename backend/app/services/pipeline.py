@@ -73,7 +73,11 @@ def _policy_input(
 ) -> PolicyInput | None:
     """Отчётность из ФНС приоритетнее анкеты; без выручки и EBITDA оценка невозможна."""
     values = features.values
-    revenue = _dec(values["fin_revenue"]) if "fin_revenue" in values else application.annual_revenue
+    revenue = (
+        _dec(values["fin_annual_turnover"])
+        if "fin_annual_turnover" in values
+        else application.annual_revenue
+    )
     ebitda = _dec(values["fin_ebitda"]) if "fin_ebitda" in values else application.annual_ebitda
     if revenue is None or ebitda is None:
         return None

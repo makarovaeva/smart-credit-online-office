@@ -4,18 +4,18 @@ from app.models.enums import RiskGrade
 from app.services.scoring import RuleBasedScoring, grade_for
 
 HEALTHY = {
-    "fin_revenue": 60_000_000.0,
+    "fin_annual_turnover": 60_000_000.0,
     "dscr_existing": 5.0,
     "debt_to_ebitda": 0.5,
     "ebitda_margin": 0.2,
     "business_age_months": 80,
     "bki_active_loans": 1,
-    "bki_credit_history_months": 60,
+    "credit_history_quality": "good",
     "weak_credit_history": False,
     "has_tax_debt": False,
     "conflicting_data": False,
     "employees_count": 20,
-    "fns_annual_income": 60_000_000.0,
+    "has_tax_activity": True,
 }
 
 

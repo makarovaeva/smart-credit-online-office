@@ -1,9 +1,9 @@
 # Внешние источники (моки) и признаки заёмщика
 
-По условиям кейса внешние системы заменены локальными моками на синтетических данных, без сетевых вызовов. Данные идут в формате генератора ML: моки ЕГРЮЛ, ФНС и БКИ отдают блоки его записи по ИНН.
+По условиям кейса внешние системы заменены локальными моками на синтетических данных, без сетевых вызовов. Данные заёмщика хранятся в формате **Borrower Profile** из [`credit_mmb_data_model_updated.md`](credit_mmb_data_model_updated.md) (раздел 2 и 8.1). На этот формат согласились команда и генератор ML.
 
 Код:
-- `backend/app/integrations/` — формат записи, загрузка датасета, запасной генератор, моки;
+- `backend/app/integrations/` — формат профиля, загрузка датасета, запасной генератор, моки;
 - `backend/app/services/features.py` — признаки;
 - `backend/app/services/enrichment.py` — сбор данных по заявке.
 
@@ -11,58 +11,59 @@
 
 ```mermaid
 flowchart LR
-    DS[(Датасет ML<br/>BORROWER_DATASET_PATH)] --> R[Запись по ИНН]
-    GEN[synthetic.py<br/>запасной генератор] -.->|ИНН нет в датасете| R
-    R -->|company| EGRUL[ЕГРЮЛ/ЕГРИП]
-    R -->|fns + financials| FNS[ФНС]
-    R -->|bki| BKI[БКИ]
-    EGRUL & FNS & BKI -->|external_checks.result| F[features.py]
+    DS[(Датасет профилей<br/>BORROWER_DATASET_PATH)] --> P[Профиль по ИНН]
+    GEN[synthetic.py<br/>запасной генератор] -.->|ИНН нет в датасете| P
+    P -->|company, head, owners| EGRUL[ЕГРЮЛ/ЕГРИП]
+    P -->|fns_data, financials| FNS[ФНС]
+    P -->|bki_data| BKI[БКИ]
+    P -->|compliance| CMP[Комплаенс]
+    EGRUL & FNS & BKI & CMP -->|external_checks.result| F[features.py]
     F --> RS[RiskSignals<br/>кредитная политика]
     F --> ML[values<br/>признаки для ML]
 ```
 
-- **Датасет ML** задаётся переменной `BORROWER_DATASET_PATH`: JSON Lines, JSON-массив или одна запись. Записи проверяются при загрузке (`dataset.BorrowerRecord`). Если нет обязательного поля, будет ошибка с его именем. Лишние поля сохраняются. Если по ИНН несколько срезов, берётся самый свежий `as_of_date`.
+- **Датасет** задаётся переменной `BORROWER_DATASET_PATH`: JSON Lines, JSON-массив или один профиль.
+  - Профили проверяются при загрузке (`dataset.BorrowerProfile`): если нет обязательного поля, будет ошибка с его именем.
+  - Обязательны блоки, по которым принимаются решения: `company`, `fns_data`, `compliance`, `bki_data`, `financials`. Блоки для экранов (`head`, `owners`, `contacts`, `bank_account`, `documents`) необязательны.
+  - Лишние поля сохраняются. Числовые поля сверх формата в `financials` и `bki_data` (например, балансовые показатели ML) автоматически становятся признаками `fin_*` и `bki_*`.
 - **ИНН, которого нет в датасете**, генерируется на лету в том же формате (`synthetic.py`). Генерация детерминирована по ИНН: здоровая компания со случайными, но стабильными параметрами. Демо-ИНН включают сценарии политики.
-- **`collect_external_data` опрашивает источники параллельно** и сохраняет ответы в `external_checks`. Если источник не ответил, проверка сохраняется со статусом `failed`, сбор не прерывается.
-- **`build_features` собирает признаки** из последних успешных ответов. Признаки неответившего источника не подставляются, источник попадает в `missing_sources`. Что делать без него, решает конвейер.
-- **`GET /companies/lookup?inn=`** предзаполняет реквизиты из блока `company`.
+- **`collect_external_data`** опрашивает источники параллельно и сохраняет ответы в `external_checks`. Если источник не ответил, проверка сохраняется со статусом `failed`, сбор не прерывается.
+- **`build_features`** собирает признаки из последних успешных ответов. Признаки неответившего источника не подставляются, источник попадает в `missing_sources`. Что делать без него, решает конвейер: заявка уходит аналитику (`missing_external_data`).
+- **`GET /companies/lookup?inn=`** предзаполняет реквизиты и учредителей из блоков `company` и `owners`.
 
-`loan_application` из записи бэкенд не использует: в продукте параметры заявки вводит клиент. Блок пригодится для синтетических демо-заявок.
+Пример профиля, который тест принимает как есть: `backend/tests/fixtures/borrower_profile_example.json` (взят из документа).
 
-## Формат записи
+## Источники
 
-Пример — `backend/tests/fixtures/ml_borrower_example.json`, тест проверяет, что он принимается как есть.
-
-| Блок | Источник | Поля |
-|---|---|---|
-| `company` | ЕГРЮЛ/ЕГРИП | `name`, `legal_form` (`OOO` / `IP`), `inn`, `registration_number` (ОГРН), `okved_main`, `region_code`, `registration_date`, `employees_count` |
-| `financials` | ФНС (бухотчётность) | `report_year`, `revenue_rub`, `operating_costs_rub`, `ebitda_rub`, `cfads_rub`, `total_debt_rub`, `annual_debt_service_rub`, `assets_rub`, `liabilities_rub`, `equity_rub` |
-| `fns` | ФНС | `is_active`, `sme_category`, `annual_income_rub`, `tax_debt_rub` |
-| `bki` | БКИ | `active_loans`, `outstanding_debt_rub`, `overdue_debt_rub`, `max_overdue_days`, `credit_history_months` |
-| `loan_application` | — | `requested_amount_rub`, `term_months`, `purpose`, `collateral_value_rub` |
-
-**Необязательные расширения.** Если генератор начнёт их отдавать, сигналы включатся без правок кода:
-- `company.status` = `bankruptcy`;
-- `company.founders[]` с `full_name`, `inn`, `share_percent`, `sanctions_match`;
-- `fns.blocked_115fz`, `fns.mass_address`, `fns.mass_director`;
-- `bki.score` (1–999), `bki.overdue_30_plus_12m`, `bki.refusals_90d`.
+| Источник (`CheckSource`) | Блоки профиля |
+|---|---|
+| `egrul` — ЕГРЮЛ/ЕГРИП | `company`, `head`, `owners` |
+| `fns` — ФНС | `fns_data`; `financials` — бухотчётность, которую банк получает через ФНС |
+| `bki` — БКИ | `bki_data` |
+| `compliance` — комплаенс | `compliance`: санкции, запрещённая деятельность |
 
 ## Демо-ИНН (запасной генератор)
 
 | ИНН | Сценарий |
 |---|---|
 | `7701000001` | Здоровая компания, зелёная зона |
-| `7701000002` | Компания недействующая (ФНС): стоп-фактор |
+| `7701000002` | Действующее банкротство: стоп-фактор |
 | `7701000003` | Запрещённая деятельность (азартные игры): стоп-фактор |
 | `7701000004` | Нет сотрудников: стоп-фактор |
-| `7701000005` | Нет доходов в ФНС: стоп-фактор «нет налоговой активности» |
+| `7701000005` | Нет налоговой активности: стоп-фактор |
 | `7701000006` | Платежи по кредитам больше EBITDA: DSCR ниже 0,9, стоп-фактор |
 | `7701000007` | Бизнесу 7 месяцев: эскалация аналитику |
-| `7701000008` | Просрочка в БКИ: слабая кредитная история, эскалация |
-| `7701000009` | Выручка в отчётности расходится с ФНС: конфликт данных, эскалация |
+| `7701000008` | Просрочка в БКИ: слабая кредитная история, эскалация и риск-надбавка |
+| `7701000009` | Счёт заблокирован по 115-ФЗ: стоп-фактор |
 | `7701000010` | Высокая действующая долговая нагрузка |
 | `7701000011` | БКИ не отвечает |
 | `7701000012` | Налоговая задолженность |
+| `7701000013` | Собственник в санкционных списках: стоп-фактор |
+| `7701000014` | Массовый адрес и массовый директор: стоп-фактор |
+| `7701000015` | Отрицательный Cash Flow 4 месяца подряд: стоп-фактор |
+| `7701000016` | Падение выручки на 25%: риск-надбавка |
+| `7701000017` | Процедура наблюдения: стоп-фактор |
+| `7701000018` | Пограничный риск: на 5 млн и 36 мес. не проходит, на большем сроке — проходит (контр-предложение с вариантами) |
 | `7701000099` | Компании нет в ЕГРЮЛ |
 | `770100000001` | ИП, здоровый бизнес |
 
@@ -70,42 +71,39 @@ flowchart LR
 
 ### Для кредитной политики (`RiskSignals`)
 
-| Сигнал | Откуда |
+| Сигнал | Поле профиля |
 |---|---|
-| Стоп-фактор `bankruptcy` | `fns.is_active = false` (недействующая компания) или `company.status = bankruptcy` |
-| Стоп-фактор `prohibited_activity` | `company.okved_main` = `92.*` (азартные игры) |
-| Стоп-фактор `no_employees` | `company.employees_count = 0` |
-| Стоп-фактор `no_tax_activity` | `fns.annual_income_rub = 0` |
-| Стоп-фактор `low_dscr` | Считает политика: EBITDA / (действующие платежи + платёж по новому кредиту) < 0,9 |
-| Стоп-факторы `sanctioned_owner`, `accounts_blocked_115fz`, `mass_address`, `mass_director` | Только из расширений формата |
+| Стоп-фактор `bankruptcy` / `observation_procedure` | `fns_data.bankruptcy_status` = `bankruptcy` / `observation` |
+| Стоп-фактор `accounts_blocked_115fz` | `fns_data.has_account_block_115fz` |
+| Стоп-факторы `mass_address`, `mass_director` | `fns_data.is_mass_address`, `fns_data.is_mass_director` |
+| Стоп-фактор `no_tax_activity` | `fns_data.has_tax_activity = false` |
+| Стоп-факторы `sanctioned_owner`, `prohibited_activity` | `compliance.sanctions_hit`, `compliance.is_prohibited_activity` |
+| Стоп-фактор `no_employees` | `company.employees_count = 0` (есть на доске, в документе не указан) |
+| Стоп-фактор `negative_cash_flow` | Самая длинная серия месяцев подряд с отрицательным `financials.cash_flow_last_12m`; больше 3 — стоп-фактор |
+| Стоп-фактор `low_dscr` | Считает политика: `financials.ebitda` / (действующие платежи + платёж по новому кредиту) < 0,9 |
 | `business_age_months` | `company.registration_date` |
-| `weak_credit_history` | `bki.overdue_debt_rub > 0` или `max_overdue_days ≥ 30`; из расширений — `score < 600`, `overdue_30_plus_12m > 0`, `refusals_90d ≥ 3` |
-| `conflicting_data` | Расхождение больше 30%: выручка в `financials` и доход в `fns`; долг в `financials` и в `bki`; выручка и платежи по кредитам в анкете клиента и в источниках |
+| `weak_credit_history` | `bki_data.credit_history_quality = weak`, или `overdue_amount > 0`, или `max_overdue_days_12m ≥ 30` |
+| `revenue_drop` | `−financials.revenue_change_pct / 100`, если выручка падает |
+| `conflicting_data` | Расхождение больше 30%: выручка в анкете и `financials.annual_turnover`; платежи по кредитам в анкете и `bki_data.monthly_debt_service` |
 
-`existing_annual_debt_service` = `financials.annual_debt_service_rub` — вход для DSCR и Debt Burden.
+`existing_annual_debt_service` = `bki_data.monthly_debt_service × 12` — вход для DSCR.
 
 `model_confidence` — выход ML-модели, его выставляет скоринг.
-
-**Нет в формате ML, сигнал не вычисляется:**
-- `negative_cash_flow_months` и `revenue_drop` — нет помесячных оборотов. Риск-надбавку к ставке даёт только слабая кредитная история.
-- ФССП и цифровой профиль.
-
-Чтобы вернуть эти сигналы, нужен блок оборотов в записи и мок источника `bank_turnover`.
 
 ### Для ML (`Features.values`)
 
 Плоский словарь, значения — числа, строки, bool:
 
-- компания: `legal_form`, `okved_main`, `region_code`, `business_age_months`, `employees_count`, `prohibited_activity`;
-- ФНС: `fns_is_active`, `sme_category`, `fns_annual_income`, `fns_tax_debt`, `has_tax_debt`;
-- отчётность: `fin_revenue`, `fin_operating_costs`, `fin_ebitda`, `fin_cfads`, `fin_total_debt`, `fin_annual_debt_service`, `fin_assets`, `fin_liabilities`, `fin_equity`, `ebitda_margin`, `debt_to_ebitda`, `equity_ratio`, `dscr_existing`;
-- БКИ: `bki_active_loans`, `bki_outstanding_debt`, `bki_overdue_debt`, `bki_max_overdue_days`, `bki_credit_history_months`, `weak_credit_history`, `bki_score` (если есть);
+- компания: `legal_form`, `okved_main`, `region_code`, `tax_system`, `business_age_months`, `employees_count`, `owners_count`;
+- ФНС: `egrul_status`, `bankruptcy_status`, `blocked_115fz`, `mass_address`, `mass_director`, `has_tax_activity`, `tax_arrears`, `has_tax_debt`;
+- комплаенс: `sanctions_hit`, `prohibited_activity`;
+- финансы: `fin_annual_turnover`, `fin_ebitda`, `fin_revenue_change_pct`, `fin_cash_flow_12m`, `negative_cash_flow_months`, `ebitda_margin`, `debt_to_ebitda`, `dscr_existing` и любые дополнительные числовые поля `financials` с префиксом `fin_`;
+- БКИ: `credit_history_quality`, `bki_active_loans`, `bki_total_debt`, `bki_monthly_debt_service`, `bki_overdue_amount`, `bki_max_overdue_days_12m`, `weak_credit_history` и дополнительные числовые поля с префиксом `bki_`;
 - `conflicting_data`.
 
 ## Допущения
 
-- `fns.is_active = false` трактуется как стоп-фактор «банкротство»: формат не различает банкротство и ликвидацию.
-- Слабая кредитная история — любая просроченная задолженность или просрочка от 30 дней.
+- Слабая кредитная история: кроме `credit_history_quality = weak`, ещё любая просроченная задолженность или просрочка от 30 дней.
 - Конфликт данных — расхождение больше 30%.
-- Запрещённая деятельность — ОКВЭД `92.*`.
+- `fns_data.egrul_status` = `liquidating` / `liquidated` пока только признак: в списке стоп-факторов документа такого кода нет.
 - Налоговая задолженность — только признак, не стоп-фактор.

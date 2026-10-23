@@ -1,8 +1,8 @@
-"""Признаки заёмщика из ответов внешних источников (формат записи генератора ML).
+"""Признаки заёмщика из ответов внешних источников (блоки Borrower Profile).
 
 Два потребителя: кредитная политика (RiskSignals) и ML-модель скоринга (плоский словарь values).
-Поля вне базового формата ML (санкции, 115-ФЗ, массовость, скор БКИ...) необязательны:
-если генератор начнёт их отдавать, соответствующие сигналы включатся сами.
+Числовые поля сверх формата профиля в financials и bki_data (например, балансовые показатели
+генератора ML) попадают в values автоматически с префиксами fin_ и bki_.
 """
 
 from collections.abc import Mapping
@@ -17,12 +17,10 @@ from app.services.credit_policy import RiskSignals
 
 # Пороговые значения, которых нет в кредитной политике на доске, - допущения
 WEAK_OVERDUE_DAYS = 30
-WEAK_BKI_SCORE = 600
-FREQUENT_REFUSALS_90D = 3
-# Расхождение между источниками, при котором данные считаются конфликтующими
+# Расхождение анкеты клиента с источниками, при котором данные считаются конфликтующими
 CONFLICT_TOLERANCE = Decimal("0.30")
-# Азартные игры
-PROHIBITED_OKVED_PREFIXES = ("92.",)
+
+SC = StopFactorCode
 
 
 @dataclass(frozen=True)
@@ -30,7 +28,7 @@ class Features:
     signals: RiskSignals
     # Плоские признаки для ML: только числа, строки, bool
     values: dict[str, Any]
-    # Годовые платежи по действующим кредитам из отчётности - вход DSCR и Debt Burden
+    # Годовые платежи по действующим кредитам из БКИ - вход DSCR
     existing_annual_debt_service: Decimal | None
     missing_sources: list[CheckSource]
     conflicts: list[str] = field(default_factory=list)
@@ -44,116 +42,112 @@ def _months_between(start: date, end: date) -> int:
     return (end.year - start.year) * 12 + end.month - start.month - (end.day < start.day)
 
 
-def _diverges(a: Decimal | None, b: Decimal | None) -> bool:
-    if a is None or b is None or max(a, b) == 0:
+def _diverges(declared: Decimal | None, actual: Decimal | None) -> bool:
+    if declared is None or actual is None or max(declared, actual) == 0:
         return False
-    return abs(a - b) / max(a, b) > CONFLICT_TOLERANCE
+    return abs(declared - actual) / max(declared, actual) > CONFLICT_TOLERANCE
 
 
 def _ratio(numerator: Decimal, denominator: Decimal) -> float | None:
     return float(round(numerator / denominator, 4)) if denominator else None
 
 
-def _company(data: Mapping[str, Any], today: date) -> tuple[dict[str, Any], set[StopFactorCode]]:
-    flags = set()
-    okved = data["okved_main"]
-    if okved.startswith(PROHIBITED_OKVED_PREFIXES):
-        flags.add(StopFactorCode.PROHIBITED_ACTIVITY)
-    if data["employees_count"] == 0:
-        flags.add(StopFactorCode.NO_EMPLOYEES)
-    if data.get("status") == "bankruptcy":
-        flags.add(StopFactorCode.BANKRUPTCY)
-    if any(f.get("sanctions_match") for f in data.get("founders", [])):
-        flags.add(StopFactorCode.SANCTIONED_OWNER)
+def _extra_numbers(block: Mapping[str, Any], prefix: str, known: set[str]) -> dict[str, float]:
+    return {
+        f"{prefix}{key}": float(value)
+        for key, value in block.items()
+        if key not in known and isinstance(value, int | float) and not isinstance(value, bool)
+    }
+
+
+def _longest_negative_streak(cash_flow: list[Any]) -> int:
+    streak = longest = 0
+    for value in cash_flow:
+        streak = streak + 1 if _dec(value) < 0 else 0
+        longest = max(longest, streak)
+    return longest
+
+
+def _egrul(data: Mapping[str, Any], today: date) -> tuple[dict[str, Any], set[SC]]:
+    company = data["company"]
+    flags = {SC.NO_EMPLOYEES} if company["employees_count"] == 0 else set()
     values = {
-        "legal_form": data["legal_form"].lower(),
-        "okved_main": okved,
-        "region_code": data["region_code"],
+        "legal_form": company["legal_form"].lower(),
+        "okved_main": company["okved_main"]["code"],
+        "region_code": company["region_code"],
+        "tax_system": company.get("tax_system") or "unknown",
         "business_age_months": _months_between(
-            date.fromisoformat(data["registration_date"]), today
+            date.fromisoformat(company["registration_date"]), today
         ),
-        "employees_count": data["employees_count"],
-        "prohibited_activity": StopFactorCode.PROHIBITED_ACTIVITY in flags,
+        "employees_count": company["employees_count"],
+        "owners_count": len(data.get("owners") or []),
     }
     return values, flags
 
 
-def _fns(data: Mapping[str, Any]) -> tuple[dict[str, Any], set[StopFactorCode]]:
-    flags = set()
-    income = _dec(data["annual_income_rub"])
-    # Недействующую компанию (банкротство, ликвидация) трактуем как стоп-фактор банкротства
-    if not data["is_active"]:
-        flags.add(StopFactorCode.BANKRUPTCY)
-    if income == 0:
-        flags.add(StopFactorCode.NO_TAX_ACTIVITY)
-    for key, code in (
-        ("blocked_115fz", StopFactorCode.ACCOUNTS_BLOCKED_115FZ),
-        ("mass_address", StopFactorCode.MASS_ADDRESS),
-        ("mass_director", StopFactorCode.MASS_DIRECTOR),
-    ):
-        if data.get(key):
-            flags.add(code)
-    tax_debt = _dec(data["tax_debt_rub"])
-    values = {
-        "fns_is_active": data["is_active"],
-        "sme_category": data["sme_category"],
-        "fns_annual_income": float(income),
-        "fns_tax_debt": float(tax_debt),
-        "has_tax_debt": tax_debt > 0,
+def _fns(data: Mapping[str, Any]) -> tuple[dict[str, Any], set[SC]]:
+    fns = data["fns_data"]
+    checks = {
+        SC.BANKRUPTCY: fns["bankruptcy_status"] == "bankruptcy",
+        SC.OBSERVATION_PROCEDURE: fns["bankruptcy_status"] == "observation",
+        SC.ACCOUNTS_BLOCKED_115FZ: fns["has_account_block_115fz"],
+        SC.MASS_ADDRESS: fns["is_mass_address"],
+        SC.MASS_DIRECTOR: fns["is_mass_director"],
+        SC.NO_TAX_ACTIVITY: not fns["has_tax_activity"],
     }
-    return values, flags
-
-
-def _financials(data: Mapping[str, Any]) -> dict[str, Any]:
-    revenue = _dec(data["revenue_rub"])
-    ebitda = _dec(data["ebitda_rub"])
-    debt = _dec(data["total_debt_rub"])
-    debt_service = _dec(data["annual_debt_service_rub"])
+    arrears = _dec(fns["tax_arrears_amount"])
     values = {
-        f"fin_{key.removesuffix('_rub')}": float(_dec(data[key]))
-        for key in (
-            "revenue_rub",
-            "operating_costs_rub",
-            "ebitda_rub",
-            "cfads_rub",
-            "total_debt_rub",
-            "annual_debt_service_rub",
-            "assets_rub",
-            "liabilities_rub",
-            "equity_rub",
-        )
+        "egrul_status": fns["egrul_status"],
+        "bankruptcy_status": fns["bankruptcy_status"],
+        "blocked_115fz": fns["has_account_block_115fz"],
+        "mass_address": fns["is_mass_address"],
+        "mass_director": fns["is_mass_director"],
+        "has_tax_activity": fns["has_tax_activity"],
+        "tax_arrears": float(arrears),
+        "has_tax_debt": arrears > 0,
     }
-    ratios = {
-        "ebitda_margin": _ratio(ebitda, revenue),
-        "debt_to_ebitda": _ratio(debt, ebitda),
-        "equity_ratio": _ratio(_dec(data["equity_rub"]), _dec(data["assets_rub"])),
-        # DSCR по действующим кредитам, без запрашиваемого
-        "dscr_existing": _ratio(ebitda, debt_service),
-    }
-    return values | {key: value for key, value in ratios.items() if value is not None}
+    return values, {code for code, hit in checks.items() if hit}
 
 
-def _bki(data: Mapping[str, Any]) -> tuple[dict[str, Any], bool]:
-    overdue_debt = _dec(data["overdue_debt_rub"])
-    score = data.get("score")
-    weak = (
-        overdue_debt > 0
-        or data["max_overdue_days"] >= WEAK_OVERDUE_DAYS
-        or (score is not None and score < WEAK_BKI_SCORE)
-        or data.get("overdue_30_plus_12m", 0) > 0
-        or data.get("refusals_90d", 0) >= FREQUENT_REFUSALS_90D
-    )
+def _financials(fin: Mapping[str, Any]) -> tuple[dict[str, Any], int, Decimal]:
+    cash_flow = fin["cash_flow_last_12m"]
+    streak = _longest_negative_streak(cash_flow)
+    change = _dec(fin["revenue_change_pct"])
+    known = {"annual_turnover", "revenue_change_pct", "ebitda", "cash_flow_last_12m"}
     values = {
-        "bki_active_loans": data["active_loans"],
-        "bki_outstanding_debt": float(_dec(data["outstanding_debt_rub"])),
-        "bki_overdue_debt": float(overdue_debt),
-        "bki_max_overdue_days": data["max_overdue_days"],
-        "bki_credit_history_months": data["credit_history_months"],
+        "fin_annual_turnover": float(_dec(fin["annual_turnover"])),
+        "fin_ebitda": float(_dec(fin["ebitda"])),
+        "fin_revenue_change_pct": float(change),
+        "fin_cash_flow_12m": float(sum((_dec(v) for v in cash_flow), Decimal(0))),
+        "negative_cash_flow_months": streak,
+        **_extra_numbers(fin, "fin_", known),
+    }
+    # Падение выручки - доля 0..1, рост не учитывается
+    return values, streak, max(Decimal(0), -change / 100)
+
+
+def _bki(bki: Mapping[str, Any]) -> tuple[dict[str, Any], bool, Decimal]:
+    overdue = _dec(bki["overdue_amount"])
+    quality = bki["credit_history_quality"]
+    weak = quality == "weak" or overdue > 0 or bki["max_overdue_days_12m"] >= WEAK_OVERDUE_DAYS
+    known = {
+        "active_loans_count",
+        "total_debt_amount",
+        "monthly_debt_service",
+        "overdue_amount",
+        "max_overdue_days_12m",
+    }
+    values = {
+        "credit_history_quality": quality,
+        "bki_active_loans": bki["active_loans_count"],
+        "bki_total_debt": float(_dec(bki["total_debt_amount"])),
+        "bki_monthly_debt_service": float(_dec(bki["monthly_debt_service"])),
+        "bki_overdue_amount": float(overdue),
+        "bki_max_overdue_days_12m": bki["max_overdue_days_12m"],
         "weak_credit_history": weak,
+        **_extra_numbers(bki, "bki_", known),
     }
-    if score is not None:
-        values["bki_score"] = score
-    return values, weak
+    return values, weak, _dec(bki["monthly_debt_service"]) * 12
 
 
 def build_features(
@@ -167,39 +161,54 @@ def build_features(
     Признаки отсутствующего источника не выставляются: что делать без них, решает конвейер."""
     today = today or date.today()
     values: dict[str, Any] = {}
-    flags: set[StopFactorCode] = set()
+    flags: set[SC] = set()
     conflicts: list[str] = []
     signal_args: dict[str, Any] = {}
     debt_service = None
-    fin = None
+    fin = bki = None
 
-    if company := results.get(CheckSource.EGRUL):
-        company_values, company_flags = _company(company, today)
-        values |= company_values
-        flags |= company_flags
-        signal_args["business_age_months"] = company_values["business_age_months"]
+    if egrul := results.get(CheckSource.EGRUL):
+        egrul_values, egrul_flags = _egrul(egrul, today)
+        values |= egrul_values
+        flags |= egrul_flags
+        signal_args["business_age_months"] = egrul_values["business_age_months"]
     if fns := results.get(CheckSource.FNS):
         fns_values, fns_flags = _fns(fns)
         values |= fns_values
         flags |= fns_flags
-        income = _dec(fns["annual_income_rub"])
-        if fin := fns.get("financials"):
-            values |= _financials(fin)
-            debt_service = _dec(fin["annual_debt_service_rub"])
-            if _diverges(_dec(fin["revenue_rub"]), income):
-                conflicts.append("Выручка в отчётности расходится с доходами в ФНС")
-        if _diverges(declared_revenue, income):
-            conflicts.append("Выручка в анкете расходится с данными ФНС")
-        if debt_service is not None and _diverges(
-            declared_monthly_debt_payments, debt_service / 12
-        ):
-            conflicts.append("Платежи по кредитам в анкете расходятся с отчётностью")
-    if bki := results.get(CheckSource.BKI):
-        bki_values, weak = _bki(bki)
+        fin = fns["financials"]
+        fin_values, streak, drop = _financials(fin)
+        values |= fin_values
+        signal_args |= {"negative_cash_flow_months": streak, "revenue_drop": drop}
+        if _diverges(declared_revenue, _dec(fin["annual_turnover"])):
+            conflicts.append("Выручка в анкете расходится с данными отчётности")
+    if compliance := results.get(CheckSource.COMPLIANCE):
+        data = compliance["compliance"]
+        values |= {
+            "sanctions_hit": data["sanctions_hit"],
+            "prohibited_activity": data["is_prohibited_activity"],
+        }
+        if data["sanctions_hit"]:
+            flags.add(SC.SANCTIONED_OWNER)
+        if data["is_prohibited_activity"]:
+            flags.add(SC.PROHIBITED_ACTIVITY)
+    if bki_response := results.get(CheckSource.BKI):
+        bki = bki_response["bki_data"]
+        bki_values, weak, debt_service = _bki(bki)
         values |= bki_values
         signal_args["weak_credit_history"] = weak
-        if fin and _diverges(_dec(fin["total_debt_rub"]), _dec(bki["outstanding_debt_rub"])):
-            conflicts.append("Долг в отчётности расходится с данными БКИ")
+        if _diverges(declared_monthly_debt_payments, debt_service / 12):
+            conflicts.append("Платежи по кредитам в анкете расходятся с данными БКИ")
+
+    if fin is not None:
+        ebitda = _dec(fin["ebitda"])
+        ratios = {
+            "ebitda_margin": _ratio(ebitda, _dec(fin["annual_turnover"])),
+            "debt_to_ebitda": _ratio(_dec(bki["total_debt_amount"]), ebitda) if bki else None,
+            # DSCR по действующим кредитам, без запрашиваемого
+            "dscr_existing": _ratio(ebitda, debt_service) if debt_service else None,
+        }
+        values |= {key: value for key, value in ratios.items() if value is not None}
 
     values["conflicting_data"] = bool(conflicts)
     missing = [source for source in SOURCES if source not in results]

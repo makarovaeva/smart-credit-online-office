@@ -270,12 +270,15 @@ async def test_submit_requires_pre_approval(
     url = f"/api/v1/applications/{draft['id']}/submit"
     assert (await api.post(url, headers=auth(client_user))).status_code == 409
 
-    await set_status(session, draft["id"], S.PRE_APPROVED)
+    application = await set_status(session, draft["id"], S.PRE_APPROVED)
+    # Оборот сгенерированной компании - от 15 млн: расхождение с анкетой больше 30%
+    application.annual_revenue = Decimal("1000000")
+    await session.flush()
     response = await api.post(url, headers=auth(client_user))
     assert response.status_code == 200
     body = response.json()
     assert body["submitted_at"] is not None
-    # Выручка в анкете (30 млн) расходится с ФНС - конвейер отправляет заявку аналитику
+    # Выручка в анкете расходится с отчётностью - конвейер отправляет заявку аналитику
     assert body["status"] == "analyst_escalation"
     assert body["client_status"] == "under_review"
     assert "submitted" in await statuses(api, client_user, draft["id"])

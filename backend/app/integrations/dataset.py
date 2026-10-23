@@ -1,16 +1,19 @@
-"""Запись о синтетическом заёмщике в формате генератора ML и загрузка датасета.
+"""Профиль заёмщика (Borrower Profile) из docs/credit_mmb_data_model_updated.md и загрузка датасета.
 
-Формат задаёт ML. Лишние поля не отбрасываются (extra="allow"): если генератор начнёт отдавать
-новые поля, они дойдут до признаков без правок здесь.
+Формат согласован командой и генератором ML. Обязательны поля, по которым принимаются решения
+(компания, fns_data, compliance, bki_data, financials). Блоки для экранов (head, owners, contacts,
+bank_account, documents) необязательны. Лишние поля не отбрасываются (extra="allow"): например,
+балансовые показатели ML в financials сами становятся признаками.
 """
 
 import json
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.config import get_settings
 
@@ -19,87 +22,121 @@ class _Block(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
+class Okved(_Block):
+    code: str
+    name: str | None = None
+
+
 class CompanyBlock(_Block):
-    name: str
-    # "OOO" | "IP"
     legal_form: str
+    full_name: str
+    short_name: str
     inn: str
-    # ОГРН / ОГРНИП
-    registration_number: str
-    okved_main: str
-    region_code: str
+    kpp: str | None = None
+    ogrn: str
     registration_date: date
+    legal_address: str | None = None
+    actual_address: str | None = None
+    okved_main: Okved
+    tax_system: str | None = None
     employees_count: int
+    region_code: str
+
+
+class HeadBlock(_Block):
+    full_name: str
+    position: str | None = None
+    inn_individual: str | None = None
+    birth_date: date | None = None
+    in_position_since: date | None = None
+    has_signing_authority: bool | None = None
+
+
+class OwnerBlock(_Block):
+    owner_id: str | None = None
+    owner_type: str | None = None
+    name: str
+    inn: str | None = None
+    ownership_share_pct: Decimal | None = None
+    is_beneficiary: bool = True
+    has_signing_authority: bool | None = None
+
+
+class FnsDataBlock(_Block):
+    retrieved_at: datetime | None = None
+    egrul_status: Literal["active", "liquidating", "liquidated"]
+    bankruptcy_status: Literal["none", "observation", "bankruptcy"]
+    has_account_block_115fz: bool
+    is_mass_address: bool
+    is_mass_director: bool
+    has_tax_activity: bool
+    tax_arrears_amount: Decimal
+
+
+class ComplianceBlock(_Block):
+    checked_at: datetime | None = None
+    source: str | None = None
+    sanctions_hit: bool
+    is_prohibited_activity: bool
+
+
+class BkiDataBlock(_Block):
+    retrieved_at: datetime | None = None
+    bureau: str | None = None
+    credit_history_quality: Literal["good", "weak", "none"]
+    active_loans_count: int
+    total_debt_amount: Decimal
+    monthly_debt_service: Decimal
+    overdue_amount: Decimal
+    max_overdue_days_12m: int
 
 
 class FinancialsBlock(_Block):
-    report_year: int
-    revenue_rub: Decimal
-    operating_costs_rub: Decimal
-    ebitda_rub: Decimal
-    cfads_rub: Decimal
-    total_debt_rub: Decimal
-    # Годовые платежи по действующим кредитам
-    annual_debt_service_rub: Decimal
-    assets_rub: Decimal
-    liabilities_rub: Decimal
-    equity_rub: Decimal
+    as_of_date: date | None = None
+    annual_turnover: Decimal
+    revenue_change_pct: Decimal
+    ebitda: Decimal
+    cash_flow_period_end: str | None = None
+    # Чистый денежный поток по месяцам, от старого к новому
+    cash_flow_last_12m: list[Decimal] = Field(min_length=1, max_length=12)
+    source: str | None = None
 
 
-class FnsBlock(_Block):
-    is_active: bool
-    sme_category: str
-    annual_income_rub: Decimal
-    tax_debt_rub: Decimal
-
-
-class BkiBlock(_Block):
-    active_loans: int
-    outstanding_debt_rub: Decimal
-    overdue_debt_rub: Decimal
-    max_overdue_days: int
-    credit_history_months: int
-
-
-class LoanApplicationBlock(_Block):
-    requested_amount_rub: Decimal
-    term_months: int
-    purpose: str
-    collateral_value_rub: Decimal | None = None
-
-
-class BorrowerRecord(_Block):
+class BorrowerProfile(_Block):
     borrower_id: str
-    application_id: str
-    as_of_date: date
+    status: str = "active"
+    customer_since: date | None = None
     company: CompanyBlock
+    head: HeadBlock | None = None
+    owners: list[OwnerBlock] = []
+    contacts: dict | None = None
+    fns_data: FnsDataBlock
+    compliance: ComplianceBlock
+    bki_data: BkiDataBlock
     financials: FinancialsBlock
-    fns: FnsBlock
-    bki: BkiBlock
-    loan_application: LoanApplicationBlock
+    bank_account: dict | None = None
+    documents: list[dict] = []
 
 
-def parse_dataset(text: str) -> list[BorrowerRecord]:
-    """JSON Lines или JSON (одна запись или список)."""
+def parse_dataset(text: str) -> list[BorrowerProfile]:
+    """JSON Lines или JSON (один профиль или список)."""
     try:
         data = json.loads(text)
         rows = data if isinstance(data, list) else [data]
     except json.JSONDecodeError:
         rows = [json.loads(line) for line in text.splitlines() if line.strip()]
-    return [BorrowerRecord.model_validate(row) for row in rows]
+    return [BorrowerProfile.model_validate(row) for row in rows]
 
 
 @lru_cache
-def load_dataset(path: str) -> dict[str, BorrowerRecord]:
-    """Записи по ИНН; если по ИНН несколько срезов - берётся самый свежий as_of_date."""
-    records: dict[str, BorrowerRecord] = {}
-    for record in parse_dataset(Path(path).read_text(encoding="utf-8")):
-        current = records.get(record.company.inn)
-        if current is None or record.as_of_date > current.as_of_date:
-            records[record.company.inn] = record
-    return records
+def load_dataset(path: str) -> dict[str, BorrowerProfile]:
+    """Профили по ИНН; если по ИНН несколько, берётся последний в файле."""
+    return {
+        profile.company.inn: profile
+        for profile in parse_dataset(Path(path).read_text(encoding="utf-8"))
+    }
 
 
-def find_record(inn: str) -> BorrowerRecord | None:
+def find_profile(inn: str) -> BorrowerProfile | None:
     path = get_settings().borrower_dataset_path
     return load_dataset(path).get(inn) if path else None
