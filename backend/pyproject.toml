@@ -12,6 +12,7 @@ dependencies = [
     "asyncpg>=0.30",
     "alembic>=1.14",
     "python-multipart>=0.0.20",
+    "numpy>=2.5.4",
 ]
 
 [dependency-groups]

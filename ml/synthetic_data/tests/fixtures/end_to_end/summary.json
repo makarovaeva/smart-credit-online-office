@@ -1,0 +1,33 @@
+{
+  "case_order": [
+    "ideal",
+    "high_risk",
+    "borderline",
+    "new_business"
+  ],
+  "scenario_count": 4,
+  "route_counts": {
+    "green_zone": 1,
+    "auto_decline": 1,
+    "analyst_escalation": 2
+  },
+  "validation": {
+    "passed": true,
+    "counts": {
+      "profiles": 4,
+      "applications": 4,
+      "assessments": 4
+    },
+    "errors": 0,
+    "warnings": 1,
+    "issues": [
+      {
+        "level": "warning",
+        "path": "assessments[1].metrics.debt_burden_pct",
+        "message": "Nonpositive EBITDA: debt burden interpretation needs policy definition"
+      }
+    ]
+  },
+  "policy_version": "2026.10_demo",
+  "model_version": "synthetic_rules_v0.1_not_ml"
+}
