@@ -114,6 +114,8 @@ class CheckSource(StrEnum):
     FSSP = "fssp"
     BANK_TURNOVER = "bank_turnover"
     DIGITAL_PROFILE = "digital_profile"
+    # Санкционные списки и запрещённая деятельность
+    COMPLIANCE = "compliance"
 
 
 class CheckStatus(StrEnum):
@@ -182,6 +184,7 @@ class StopFactorCode(StrEnum):
 
     # Юридические
     BANKRUPTCY = "bankruptcy"
+    OBSERVATION_PROCEDURE = "observation_procedure"
     ACCOUNTS_BLOCKED_115FZ = "accounts_blocked_115fz"
     SANCTIONED_OWNER = "sanctioned_owner"
     PROHIBITED_ACTIVITY = "prohibited_activity"

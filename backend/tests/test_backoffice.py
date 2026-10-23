@@ -120,7 +120,7 @@ async def test_detail_and_decision_only_for_own(
     assert body["assignee_id"] == str(owner.id)
     assert body["credit_memo"]["ai_recommendation"] == "approve"
     assert body["scoring"]["risk_zone"] == "green"
-    assert len(body["external_checks"]) == 6
+    assert len(body["external_checks"]) == 8
     assert body["company"]["inn"] == "7701000001"
 
     assert (await api.get(f"{QUEUE}/{app_id}", headers=auth(stranger))).status_code == 404

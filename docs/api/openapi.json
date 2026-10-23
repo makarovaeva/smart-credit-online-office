@@ -4372,7 +4372,8 @@
           "bki",
           "fssp",
           "bank_turnover",
-          "digital_profile"
+          "digital_profile",
+          "compliance"
         ],
         "title": "CheckSource"
       },
@@ -6426,6 +6427,7 @@
         "type": "string",
         "enum": [
           "bankruptcy",
+          "observation_procedure",
           "accounts_blocked_115fz",
           "sanctioned_owner",
           "prohibited_activity",

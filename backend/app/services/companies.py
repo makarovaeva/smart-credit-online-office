@@ -1,7 +1,6 @@
 """Компании заёмщиков."""
 
 from datetime import date
-from decimal import Decimal
 
 from app.integrations import CompanyNotFoundError, egrul
 from app.models.enums import LegalForm
@@ -20,30 +19,30 @@ REGIONS = {
 
 
 async def lookup_requisites(inn: str) -> CompanyRequisites:
-    """Реквизиты из (мока) ЕГРЮЛ/ЕГРИП для предзаполнения."""
+    """Реквизиты и учредители из (мока) ЕГРЮЛ/ЕГРИП для предзаполнения."""
     try:
         data = await egrul.fetch(inn)
     except CompanyNotFoundError:
         raise NotFoundError("Компания с таким ИНН не найдена в ЕГРЮЛ/ЕГРИП") from None
-    legal_form = LegalForm(data["legal_form"].lower())
+    company = data["company"]
     return CompanyRequisites(
-        inn=data["inn"],
-        ogrn=data["registration_number"],
-        kpp=data.get("kpp"),
-        legal_form=legal_form,
-        name=data["name"],
-        okved_main=data["okved_main"],
-        registration_date=date.fromisoformat(data["registration_date"]),
-        region=REGIONS.get(data["region_code"], f"Регион {data['region_code']}"),
-        legal_address=data.get("legal_address"),
-        employees_count=data["employees_count"],
+        inn=company["inn"],
+        ogrn=company["ogrn"],
+        kpp=company.get("kpp"),
+        legal_form=LegalForm(company["legal_form"].lower()),
+        name=company["short_name"],
+        okved_main=company["okved_main"]["code"],
+        registration_date=date.fromisoformat(company["registration_date"]),
+        region=REGIONS.get(company["region_code"], f"Регион {company['region_code']}"),
+        legal_address=company.get("legal_address"),
+        employees_count=company["employees_count"],
         owners=[
             CompanyOwnerRead(
-                full_name=f["full_name"],
-                inn=f.get("inn"),
-                share_percent=Decimal(str(f["share_percent"])) if "share_percent" in f else None,
-                is_beneficiary=f.get("is_beneficiary", True),
+                full_name=owner["name"],
+                inn=owner.get("inn"),
+                share_percent=owner.get("ownership_share_pct"),
+                is_beneficiary=owner.get("is_beneficiary", True),
             )
-            for f in data.get("founders", [])
+            for owner in data.get("owners") or []
         ],
     )

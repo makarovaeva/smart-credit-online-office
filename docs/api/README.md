@@ -81,7 +81,7 @@ cd backend && uv run python -m scripts.export_openapi
 | POST | `/backoffice/applications/{id}/analyst-conclusion` | аналитик | Заключение: `analyst_escalation → analyst_completed → underwriter_review` |
 | POST | `/backoffice/applications/{id}/decision` | андеррайтер | Одно из 4 решений. `more_information_required` с `more_info_target`: `client` — дозапрос документов, `credit_analyst` — запрос экспертизы. `conditional_approval` с `alternative_offer` берёт условия варианта из AI Credit Memo |
 
-Этапы `data_collection`, `ai_*`, `decision_routing` (включая автоотказ по стоп-фактору), `contract_generation`, `disbursement` двигает конвейер, публичных эндпоинтов для них нет. Внешние источники (ЕГРЮЛ, ФНС, БКИ) — внутренние модули-моки на данных генератора ML в `app/integrations/`, описаны в [`../external-sources.md`](../external-sources.md).
+Этапы `data_collection`, `ai_*`, `decision_routing` (включая автоотказ по стоп-фактору), `contract_generation`, `disbursement` двигает конвейер, публичных эндпоинтов для них нет. Внешние источники (ЕГРЮЛ, ФНС, БКИ, комплаенс) — внутренние модули-моки на профилях заёмщиков (формат Borrower Profile из [`../credit_mmb_data_model_updated.md`](../credit_mmb_data_model_updated.md)) в `app/integrations/`, описаны в [`../external-sources.md`](../external-sources.md).
 
 ## Открытые вопросы
 

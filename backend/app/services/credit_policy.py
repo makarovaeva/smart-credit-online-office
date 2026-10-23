@@ -56,10 +56,8 @@ COLLATERAL_DISCOUNTS: dict[CollateralType, Decimal] = {
 }
 
 STOP_FACTORS: dict[StopFactorCode, tuple[StopFactorCategory, str]] = {
-    StopFactorCode.BANKRUPTCY: (
-        StopFactorCategory.LEGAL,
-        "Действующее банкротство или процедура наблюдения",
-    ),
+    StopFactorCode.BANKRUPTCY: (StopFactorCategory.LEGAL, "Действующее банкротство"),
+    StopFactorCode.OBSERVATION_PROCEDURE: (StopFactorCategory.LEGAL, "Процедура наблюдения"),
     StopFactorCode.ACCOUNTS_BLOCKED_115FZ: (
         StopFactorCategory.LEGAL,
         "Счета заблокированы по 115-ФЗ",

@@ -32,12 +32,17 @@ async def test_collects_all_sources(
     application = await make_application(session, company, product, client_user)
     checks = await collect_external_data(session, application)
 
-    assert {c.source for c in checks} == {CheckSource.EGRUL, CheckSource.FNS, CheckSource.BKI}
+    assert {c.source for c in checks} == {
+        CheckSource.EGRUL,
+        CheckSource.FNS,
+        CheckSource.BKI,
+        CheckSource.COMPLIANCE,
+    }
     assert all(c.status == CheckStatus.SUCCESS and c.completed_at for c in checks)
 
     features = await application_features(session, application)
     assert features.missing_sources == []
-    assert features.values["fin_revenue"] > 0
+    assert features.values["fin_annual_turnover"] > 0
 
 
 async def test_failed_source_is_saved(
@@ -64,6 +69,8 @@ async def test_lookup_requisites(api: AsyncClient, client_user: User) -> None:
     assert body["legal_form"] == "ooo"
     assert body["ogrn"].startswith("1")
     assert body["region"]
+    assert body["legal_address"]
+    assert len(body["owners"]) == 2
 
     missing = await api.get(
         "/api/v1/companies/lookup", params={"inn": "7701000099"}, headers=auth(client_user)

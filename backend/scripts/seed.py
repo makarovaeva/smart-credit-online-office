@@ -31,7 +31,7 @@ EMPLOYEES = [
 # Телефон, имя, ИНН компании (демо-сценарии из app/integrations/synthetic.py)
 CLIENTS = [
     ("+79990000001", "Алексей Иванов", "7701000001"),  # здоровая компания
-    ("+79990000002", "Сергей Смирнов", "7712345678"),  # пограничный риск: 5 млн - контр-оффер
+    ("+79990000002", "Сергей Смирнов", "7701000018"),  # пограничный риск: 5 млн - контр-оффер
     ("+79990000003", "Дмитрий Кузнецов", "7701000002"),  # недействующая компания: автоотказ
     ("+79990000004", "Андрей Попов", "7701000007"),  # бизнесу 7 месяцев: к аналитику
     ("+79990000005", "Михаил Соколов", "770100000001"),  # ИП
@@ -120,7 +120,6 @@ async def _company(session: AsyncSession, inn: str, owner: User) -> None:
             "okved_main": requisites.okved_main,
             "registration_date": requisites.registration_date,
             "region": requisites.region,
-            # В формате данных ML адреса нет
             "legal_address": requisites.legal_address or requisites.region,
             "employees_count": requisites.employees_count,
         },
@@ -138,14 +137,16 @@ async def _company(session: AsyncSession, inn: str, owner: User) -> None:
         select(CompanyOwner.id).where(CompanyOwner.company_id == company.id).limit(1)
     )
     if not has_owners:
-        session.add(
-            CompanyOwner(
-                company_id=company.id,
-                full_name=owner.full_name,
-                share_percent=Decimal("100"),
-                is_beneficiary=True,
+        for registry_owner in requisites.owners:
+            session.add(
+                CompanyOwner(
+                    company_id=company.id,
+                    full_name=registry_owner.full_name,
+                    inn=registry_owner.inn,
+                    share_percent=registry_owner.share_percent,
+                    is_beneficiary=registry_owner.is_beneficiary,
+                )
             )
-        )
 
 
 async def seed(session: AsyncSession) -> None:

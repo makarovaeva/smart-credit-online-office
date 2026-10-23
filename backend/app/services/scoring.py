@@ -80,8 +80,8 @@ class RuleBasedScoring:
                 add("business_age_months", -60, "Бизнесу меньше года")
         if features.get("weak_credit_history"):
             add("weak_credit_history", -120, "Просрочки в кредитной истории")
-        elif features.get("bki_credit_history_months", 0) >= 36:
-            add("bki_credit_history_months", 30, "Длинная кредитная история без просрочек")
+        elif features.get("credit_history_quality") == "good":
+            add("credit_history_quality", 30, "Хорошая кредитная история")
         if features.get("has_tax_debt"):
             add("has_tax_debt", -40, "Налоговая задолженность")
         if features.get("conflicting_data"):
@@ -101,7 +101,7 @@ class RuleBasedScoring:
     def _confidence(features: Mapping[str, Any]) -> Decimal:
         """Чем меньше данных и чем больше противоречий, тем ниже уверенность."""
         confidence = Decimal("0.92")
-        for group in ("fin_revenue", "bki_active_loans", "business_age_months"):
+        for group in ("fin_annual_turnover", "bki_active_loans", "business_age_months"):
             if group not in features:
                 confidence -= Decimal("0.15")
         if features.get("conflicting_data"):
@@ -112,7 +112,7 @@ class RuleBasedScoring:
     def _fraud_score(features: Mapping[str, Any]) -> Decimal:
         signals = (
             features.get("employees_count") == 0,
-            features.get("fns_annual_income") == 0,
+            features.get("has_tax_activity") is False,
             bool(features.get("mass_address")),
             bool(features.get("mass_director")),
             bool(features.get("conflicting_data")),
