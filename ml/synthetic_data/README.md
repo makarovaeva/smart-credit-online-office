@@ -7,14 +7,14 @@
 ## Команды из корня репозитория (PowerShell, uv-проект в `backend/`)
 
 ```powershell
-uv run --project backend python -m unittest discover -s ml/synthetic_data/tests -t ml/synthetic_data -p "test_*.py" -v
+uv run --project backend --group ml python -m unittest discover -s ml/synthetic_data/tests -t ml/synthetic_data -p "test_*.py" -v
 
-uv run --project backend python ml/synthetic_data/financials.py `
+uv run --project backend --group ml python ml/synthetic_data/financials.py `
   --profiles ml/synthetic_data/tests/fixtures/profiles.json `
   --out ml/synthetic_data/data/profiles_generated.json `
   --seed 42
 
-uv run --project backend python ml/synthetic_data/validation.py `
+uv run --project backend --group ml python ml/synthetic_data/validation.py `
   --profiles ml/synthetic_data/data/profiles_generated.json `
   --applications ml/synthetic_data/tests/fixtures/applications.json `
   --report ml/synthetic_data/data/quality_report.json
@@ -25,9 +25,9 @@ uv run --project backend python ml/synthetic_data/validation.py `
 ## Команды из `ml/synthetic_data/`
 
 ```powershell
-uv run --project ..\..\backend python -m unittest discover -s tests -t . -p "test_*.py" -v
-uv run --project ..\..\backend python financials.py --profiles tests\fixtures\profiles.json --out data\profiles_generated.json --seed 42
-uv run --project ..\..\backend python validation.py --profiles data\profiles_generated.json --applications tests\fixtures\applications.json --report data\quality_report.json
+uv run --project ..\..\backend --group ml python -m unittest discover -s tests -t . -p "test_*.py" -v
+uv run --project ..\..\backend --group ml python financials.py --profiles tests\fixtures\profiles.json --out data\profiles_generated.json --seed 42
+uv run --project ..\..\backend --group ml python validation.py --profiles data\profiles_generated.json --applications tests\fixtures\applications.json --report data\quality_report.json
 ```
 
 `assessments.json` используется только в unit-тестах полной кредитной оценки.
@@ -48,17 +48,17 @@ uv run --project ..\..\backend python validation.py --profiles data\profiles_gen
 Из корня Git-репозитория (PowerShell, зависимости через `backend/pyproject.toml`):
 
 ```powershell
-uv run --project backend python ml/synthetic_data/company.py `
+uv run --project backend --group ml python ml/synthetic_data/company.py `
   --count 1200 --seed 42 --as-of 2026-09-30 --mix population `
   --out ml/synthetic_data/data/profiles_generated.json `
   --summary-out ml/synthetic_data/data/company_summary.json
 
-uv run --project backend python ml/synthetic_data/validation.py `
+uv run --project backend --group ml python ml/synthetic_data/validation.py `
   --profiles ml/synthetic_data/data/profiles_generated.json `
   --applications ml/synthetic_data/tests/fixtures/empty_applications.json `
   --report ml/synthetic_data/data/quality_report.json
 
-uv run --project backend python -m unittest discover `
+uv run --project backend --group ml python -m unittest discover `
   -s ml/synthetic_data/tests -t ml/synthetic_data `
   -p "test_*.py" -v
 ```

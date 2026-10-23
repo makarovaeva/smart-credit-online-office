@@ -1,16 +1,18 @@
 import json
-from pathlib import Path
+
+import yaml
+from openapi_spec_validator import validate
 
 from app.main import app
+from scripts.export_openapi import JSON_OUTPUT, YAML_OUTPUT
 
-EXPORTED = Path(__file__).resolve().parents[2] / "docs" / "api" / "openapi.json"
 
-
-def test_openapi_builds() -> None:
-    schema = app.openapi()
-    assert "/api/v1/applications/{application_id}/submit" in schema["paths"]
+def test_spec_is_valid_openapi() -> None:
+    validate(app.openapi())
 
 
 def test_exported_spec_is_up_to_date() -> None:
     """Если упал - перегенерируй: uv run python -m scripts.export_openapi"""
-    assert json.loads(EXPORTED.read_text()) == app.openapi()
+    spec = app.openapi()
+    assert json.loads(JSON_OUTPUT.read_text()) == spec
+    assert yaml.safe_load(YAML_OUTPUT.read_text()) == spec

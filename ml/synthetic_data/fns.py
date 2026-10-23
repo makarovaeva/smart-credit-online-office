@@ -8,7 +8,7 @@ remain untouched. The existing contract historically includes the bank's
 it is not an ordinary FNS registry attribute.
 
 Run (from repository root):
-    uv run --project backend python ml/synthetic_data/fns.py \
+    uv run --project backend --group ml python ml/synthetic_data/fns.py \
       --profiles ml/synthetic_data/data/profiles_bki.json \
       --out ml/synthetic_data/data/profiles_fns.json \
       --summary-out ml/synthetic_data/data/fns_summary.json \

@@ -12,7 +12,6 @@ dependencies = [
     "asyncpg>=0.30",
     "alembic>=1.14",
     "python-multipart>=0.0.20",
-    "numpy>=2.5.4",
 ]
 
 [dependency-groups]
@@ -21,6 +20,13 @@ dev = [
     "pytest-asyncio>=0.24",
     "httpx>=0.28",
     "ruff>=0.8",
+    "openapi-spec-validator>=0.7",
+    "pyyaml>=6.0",
+]
+# Генератор синтетических данных ML (ml/synthetic_data); в образ API не ставится:
+# uv run --project backend --group ml python ml/synthetic_data/...
+ml = [
+    "numpy>=2.5.4",
 ]
 
 [tool.uv]

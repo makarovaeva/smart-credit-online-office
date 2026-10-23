@@ -1,7 +1,7 @@
 """Synthetic credit bureau (BKI) enrichment for existing Borrower Profiles.
 
 Usage from repository root (with uv project in backend/):
-    uv run --project backend python ml/synthetic_data/bki.py \
+    uv run --project backend --group ml python ml/synthetic_data/bki.py \
         --profiles ml/synthetic_data/data/profiles_companies.json \
         --out ml/synthetic_data/data/profiles_bki.json \
         --seed 43 --scenario baseline

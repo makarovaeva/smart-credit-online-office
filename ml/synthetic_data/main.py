@@ -4,7 +4,7 @@ Uses the existing generators as Python modules. Inputs stay in memory until
 semantic validation passes. Distinct outputs are written to --out-dir.
 
 Run from repository root:
-  uv run --project backend python ml/synthetic_data/main.py \
+  uv run --project backend --group ml python ml/synthetic_data/main.py \
     --count 1200 --seed 42 --scenario baseline \
     --out-dir ml/synthetic_data/data/run_001
 

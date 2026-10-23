@@ -9,7 +9,7 @@ bank-applicant frequencies or real bank policy. One application per borrower
 in this MVP; no active-application or historical versions are simulated.
 
 Example (run from repository root):
-    uv run --project backend python ml/synthetic_data/applications.py \
+    uv run --project backend --group ml python ml/synthetic_data/applications.py \
         --profiles ml/synthetic_data/data/profiles_compliance.json \
         --out ml/synthetic_data/data/applications_generated.json \
         --summary-out ml/synthetic_data/data/applications_summary.json \

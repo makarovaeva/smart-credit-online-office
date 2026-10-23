@@ -28,7 +28,7 @@ Run from the **repository root**, where `backend/pyproject.toml` exists:
 
 ```powershell
 uv sync --project backend
-uv run --project backend python ml/synthetic_data/main.py `
+uv run --project backend --group ml python ml/synthetic_data/main.py `
   --count 1200 --seed 42 --scenario baseline `
   --out-dir ml/synthetic_data/data/run_baseline_42
 ```
@@ -40,11 +40,11 @@ the team, inside `backend/` run `uv add numpy` and commit `pyproject.toml` and
 ### Generate alternative independent datasets
 
 ```powershell
-uv run --project backend python ml/synthetic_data/main.py `
+uv run --project backend --group ml python ml/synthetic_data/main.py `
   --count 1200 --seed 42 --scenario stress_2025 `
   --out-dir ml/synthetic_data/data/run_stress_42
 
-uv run --project backend python ml/synthetic_data/main.py `
+uv run --project backend --group ml python ml/synthetic_data/main.py `
   --count 1200 --seed 42 --scenario demo --mix demo `
   --out-dir ml/synthetic_data/data/run_demo_42
 ```
@@ -77,7 +77,7 @@ For the backend integration, import these **three** files together:
 ### Run a single stage
 
 ```powershell
-uv run --project backend python ml/synthetic_data/assessment.py `
+uv run --project backend --group ml python ml/synthetic_data/assessment.py `
   --profiles ml/synthetic_data/data/run_baseline_42/profiles_compliance.json `
   --applications ml/synthetic_data/data/run_baseline_42/applications_generated.json `
   --out ml/synthetic_data/data/assessments_single.json `
@@ -88,16 +88,16 @@ uv run --project backend python ml/synthetic_data/assessment.py `
 ### Validate, test, and create statistical plots
 
 ```powershell
-uv run --project backend python ml/synthetic_data/validation.py `
+uv run --project backend --group ml python ml/synthetic_data/validation.py `
   --profiles ml/synthetic_data/data/run_baseline_42/profiles_compliance.json `
   --applications ml/synthetic_data/data/run_baseline_42/applications_assessed.json `
   --assessments ml/synthetic_data/data/run_baseline_42/assessments_generated.json `
   --report ml/synthetic_data/data/run_baseline_42/quality_rechecked.json
 
-uv run --project backend python -m unittest discover `
+uv run --project backend --group ml python -m unittest discover `
   -s ml/synthetic_data/tests -t ml/synthetic_data -p "test_*.py" -v
 
-uv run --project backend --with matplotlib python ml/synthetic_data/main.py `
+uv run --project backend --group ml --with matplotlib python ml/synthetic_data/main.py `
   --count 1200 --seed 43 --scenario baseline --stats `
   --out-dir ml/synthetic_data/data/run_baseline_43
 ```
