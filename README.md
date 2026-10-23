@@ -13,25 +13,40 @@ backend/    Python API (FastAPI, SQLAlchemy 2 async, Alembic, PostgreSQL)
     models/        ORM-модели
     schemas/       Pydantic-схемы запросов/ответов
     services/      бизнес-логика (конвейер, скоринг, кредитное решение)
-    integrations/  моки внешних сервисов (БКИ, ЕГРЮЛ/ЕГРИП, ФНС)
+    integrations/  моки внешних сервисов (ЕГРЮЛ/ЕГРИП, ФНС, БКИ, комплаенс)
   migrations/      миграции Alembic
+  scripts/         демо-данные, запуск контейнера, экспорт OpenAPI
   tests/
 frontend/   веб-клиент
-infra/      docker-compose и окружение
+data/       датасет профилей заёмщиков от ML (монтируется в backend)
 docs/       архитектура, API, диаграмма состояний, модель данных
+docker-compose.yml, .env.example   единый запуск решения
 ```
 
 ## Запуск
 
+Нужен только Docker с Compose v2. Из корня репозитория:
+
 ```bash
-cd infra
-cp .env.example .env
+cp .env.example .env    # необязательно: без .env работают значения по умолчанию
 docker compose up --build
 ```
 
-API: http://localhost:8000, Swagger: http://localhost:8000/docs
+- API: http://localhost:8000, Swagger: http://localhost:8000/docs
+- PostgreSQL: `localhost:5432` (`credit` / `credit`)
 
-При старте контейнер накатывает миграции и загружает демо-данные (`python -m scripts.seed`, идемпотентно).
+Если порты заняты, поменяйте `BACKEND_PORT` и `POSTGRES_PORT` в `.env`.
+
+При старте backend накатывает миграции и загружает демо-данные (`scripts/seed.py`, идемпотентно; отключается `SEED_DEMO_DATA=false`). Данные БД хранятся в volume `postgres_data`. Начать с чистой базы: `docker compose down -v`.
+
+Датасет профилей заёмщиков от ML кладётся в `data/` и подключается переменной `BORROWER_DATASET_PATH` (см. [`data/README.md`](data/README.md)).
+
+**Фиксация версий:**
+- зависимости backend — `backend/uv.lock`; образ собирается с `uv sync --locked`, поэтому сборка падает, если lock отстал от `pyproject.toml`;
+- базовые образы — точные теги: `python:3.12.15-slim`, `postgres:16.15-alpine`;
+- `uv` — `0.13.5`.
+
+Сервисы `frontend` и `ml` добавятся в `docker-compose.yml`, когда появятся в репозитории; шаблоны — в комментариях в файле.
 
 ## Демо-доступ
 

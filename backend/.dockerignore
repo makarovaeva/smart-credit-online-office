@@ -5,3 +5,6 @@ __pycache__
 .ruff_cache
 .env
 tests
+.mypy_cache
+Dockerfile
+.dockerignore
