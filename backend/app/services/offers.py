@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import Application, CreditDecision, User
 from app.models.enums import ActorType, ApplicationStatus, CloseReason, DecisionType, OfferResponse
 from app.schemas.decision import DecisionRead, OfferRead
+from app.services import loans
 from app.services.applications import get_client_application
 from app.services.credit_policy import monthly_payment
 from app.services.errors import ConflictError, NotFoundError
@@ -17,6 +18,10 @@ from app.services.transitions import transition
 
 S = ApplicationStatus
 OFFER_DECISIONS = (DecisionType.APPROVED, DecisionType.CONDITIONAL_APPROVAL)
+# Оффер уже принят: повторный accept возвращает текущее состояние или доводит прерванный шаг
+AFTER_ACCEPT = frozenset(
+    {S.OFFER_ACCEPTED, S.CONTRACT_GENERATION, S.E_SIGN, S.DISBURSEMENT, S.COMPLETED}
+)
 
 
 def _decision_data(decision: CreditDecision) -> dict:
@@ -67,16 +72,28 @@ async def _open_offer(session: AsyncSession, application: Application) -> Credit
 
 
 async def accept_offer(session: AsyncSession, user: User, application_id: uuid.UUID) -> Application:
+    """offer_generated -> offer_accepted -> contract_generation -> e_sign: договор и график
+    готовятся сразу. Повторный вызов после принятия ничего не меняет."""
     application = await get_client_application(session, user, application_id, for_update=True)
-    decision = await _open_offer(session, application)
-    decision.client_response = OfferResponse.ACCEPTED
-    decision.client_responded_at = datetime.now(UTC)
+    if application.status in AFTER_ACCEPT:
+        decision = await _latest_offer(session, application.id)
+    else:
+        decision = await _open_offer(session, application)
+        decision.client_response = OfferResponse.ACCEPTED
+        decision.client_responded_at = datetime.now(UTC)
+        await transition(session, application, S.OFFER_ACCEPTED, ActorType.CLIENT, user.id)
 
-    await transition(session, application, S.OFFER_ACCEPTED, ActorType.CLIENT, user.id)
-    await transition(session, application, S.CONTRACT_GENERATION, ActorType.SYSTEM)
-    await transition(
-        session, application, S.E_SIGN, ActorType.SYSTEM, comment="Договор подготовлен"
-    )
+    if application.status == S.OFFER_ACCEPTED:
+        await transition(session, application, S.CONTRACT_GENERATION, ActorType.SYSTEM)
+    if application.status == S.CONTRACT_GENERATION:
+        contract = await loans.prepare_contract(session, application, decision)
+        await transition(
+            session,
+            application,
+            S.E_SIGN,
+            ActorType.SYSTEM,
+            comment=f"Договор {contract.contract_number} подготовлен",
+        )
     await session.commit()
     return application
 
@@ -106,13 +123,40 @@ async def reject_offer(
 async def sign_agreement(
     session: AsyncSession, user: User, application_id: uuid.UUID
 ) -> Application:
-    """Код подтверждения не сверяется: в симуляции он показывается прямо в интерфейсе."""
+    """e_sign -> disbursement -> completed: подпись, открытие ссудного счёта, зачисление.
+    Код подтверждения не сверяется - в симуляции он показывается в интерфейсе.
+    Если выдача прервалась, повторный вызов её доводит; после выдачи - ничего не меняет."""
     application = await get_client_application(session, user, application_id, for_update=True)
+    if application.status == S.COMPLETED:
+        return application
+    if application.status not in (S.E_SIGN, S.DISBURSEMENT):
+        raise ConflictError("Договор ещё не готов к подписанию")
+
+    contract = await loans.get_contract(session, application.id)
+    if contract is None:
+        # Заявка дошла до подписания до появления договоров - готовим его сейчас
+        decision = await _latest_offer(session, application.id)
+        contract = await loans.prepare_contract(session, application, decision)
+    if application.status == S.E_SIGN:
+        loans.sign_contract(contract)
+        await transition(
+            session,
+            application,
+            S.DISBURSEMENT,
+            ActorType.CLIENT,
+            user.id,
+            comment=f"Договор {contract.contract_number} подписан",
+        )
+        # Подпись сохраняется, даже если выдача не пройдёт
+        await session.commit()
+
+    await loans.disburse(session, application, contract)
     await transition(
-        session, application, S.DISBURSEMENT, ActorType.CLIENT, user.id, comment="Договор подписан"
-    )
-    await transition(
-        session, application, S.COMPLETED, ActorType.SYSTEM, comment="Средства зачислены"
+        session,
+        application,
+        S.COMPLETED,
+        ActorType.SYSTEM,
+        comment=f"Средства зачислены на счёт {contract.settlement_account_number}",
     )
     await session.commit()
     return application

@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, Query, UploadFile, status
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import (
@@ -29,8 +29,9 @@ from app.schemas.application import (
 from app.schemas.common import Page
 from app.schemas.decision import OfferRead, RejectOfferRequest
 from app.schemas.document import DocumentRead, InfoRequestAnswer, InfoRequestRead
+from app.schemas.loan import LoanContractRead
 from app.services import applications as service
-from app.services import offers
+from app.services import loans, offers
 
 router = APIRouter(
     prefix="/applications", tags=["applications"], responses=AUTH_RESPONSES | NOT_FOUND
@@ -255,3 +256,16 @@ async def sign_agreement(
     Код подтверждения не сверяется - в симуляции он показывается в интерфейсе."""
     application = await offers.sign_agreement(session, user, application_id)
     return await service.to_read(session, application)
+
+
+@router.get("/{application_id}/contract")
+async def get_contract(
+    application_id: ApplicationId, user: CurrentClient, session: SessionDep
+) -> LoanContractRead:
+    """Кредитный договор и график платежей. Появляется после принятия оффера; до подписания -
+    проект с плановыми датами, после выдачи - ссудный счёт и даты от фактической выдачи."""
+    application = await service.get_client_application(session, user, application_id)
+    contract = await loans.get_contract(session, application.id)
+    if contract is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Договор ещё не сформирован")
+    return await loans.to_contract_read(session, contract)

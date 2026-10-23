@@ -2424,6 +2424,215 @@
         }
       }
     },
+    "/api/v1/applications/{application_id}/contract": {
+      "get": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Get Contract",
+        "description": "Кредитный договор и график платежей. Появляется после принятия оффера; до подписания -\nпроект с плановыми датами, после выдачи - ссудный счёт и даты от фактической выдачи.",
+        "operationId": "get_contract_api_v1_applications__application_id__contract_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoanContractRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Нет или невалидный токен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Недостаточно прав",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Объект не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/loans": {
+      "get": {
+        "tags": [
+          "loans"
+        ],
+        "summary": "List Loans",
+        "description": "Раздел «Кредиты»: договоры компаний клиента с остатком долга и ближайшим платежом.",
+        "operationId": "list_loans_api_v1_loans_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LoanShort"
+                  },
+                  "type": "array",
+                  "title": "Response List Loans Api V1 Loans Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Нет или невалидный токен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Недостаточно прав",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/loans/{contract_id}": {
+      "get": {
+        "tags": [
+          "loans"
+        ],
+        "summary": "Get Loan",
+        "description": "Кредит с графиком платежей.",
+        "operationId": "get_loan_api_v1_loans__contract_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "contract_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Contract Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoanContractRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Нет или невалидный токен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Недостаточно прав",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Объект не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/notifications": {
       "get": {
         "tags": [
@@ -4191,6 +4400,16 @@
             "type": "array",
             "title": "Decisions"
           },
+          "contract": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoanContractRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "info_requests": {
             "items": {
               "$ref": "#/components/schemas/InfoRequestRead"
@@ -4225,6 +4444,7 @@
           "scoring",
           "credit_memo",
           "decisions",
+          "contract",
           "info_requests",
           "documents",
           "history"
@@ -5551,6 +5771,193 @@
         ],
         "title": "LegalForm"
       },
+      "LoanContractRead": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "application_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Application Id"
+          },
+          "contract_number": {
+            "type": "string",
+            "title": "Contract Number"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LoanContractStatus"
+          },
+          "principal_amount": {
+            "type": "string",
+            "title": "Principal Amount"
+          },
+          "term_months": {
+            "type": "integer",
+            "title": "Term Months"
+          },
+          "interest_rate": {
+            "type": "string",
+            "title": "Interest Rate"
+          },
+          "monthly_payment": {
+            "type": "string",
+            "title": "Monthly Payment"
+          },
+          "disbursed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disbursed At"
+          },
+          "maturity_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Maturity Date"
+          },
+          "outstanding_balance": {
+            "type": "string",
+            "title": "Outstanding Balance"
+          },
+          "next_payment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentScheduleItemRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "repayment_type": {
+            "$ref": "#/components/schemas/RepaymentType"
+          },
+          "first_payment_date": {
+            "type": "string",
+            "format": "date",
+            "title": "First Payment Date"
+          },
+          "signed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed At"
+          },
+          "signature_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signature Id"
+          },
+          "loan_account_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loan Account Number"
+          },
+          "settlement_account_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settlement Account Number"
+          },
+          "disbursement_transaction_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disbursement Transaction Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "schedule": {
+            "items": {
+              "$ref": "#/components/schemas/PaymentScheduleItemRead"
+            },
+            "type": "array",
+            "title": "Schedule"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "application_id",
+          "contract_number",
+          "status",
+          "principal_amount",
+          "term_months",
+          "interest_rate",
+          "monthly_payment",
+          "disbursed_at",
+          "maturity_date",
+          "outstanding_balance",
+          "next_payment",
+          "currency",
+          "repayment_type",
+          "first_payment_date",
+          "signed_at",
+          "signature_id",
+          "loan_account_number",
+          "settlement_account_number",
+          "disbursement_transaction_id",
+          "created_at",
+          "schedule"
+        ],
+        "title": "LoanContractRead",
+        "description": "Кредитный договор с графиком платежей. До подписания - проект с плановыми датами."
+      },
+      "LoanContractStatus": {
+        "type": "string",
+        "enum": [
+          "awaiting_signature",
+          "signed",
+          "active",
+          "overdue",
+          "closed"
+        ],
+        "title": "LoanContractStatus",
+        "description": "Статус кредитного договора (раздел «Кредиты»)."
+      },
       "LoanPurpose": {
         "type": "string",
         "enum": [
@@ -5561,6 +5968,91 @@
           "other"
         ],
         "title": "LoanPurpose"
+      },
+      "LoanShort": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "application_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Application Id"
+          },
+          "contract_number": {
+            "type": "string",
+            "title": "Contract Number"
+          },
+          "status": {
+            "$ref": "#/components/schemas/LoanContractStatus"
+          },
+          "principal_amount": {
+            "type": "string",
+            "title": "Principal Amount"
+          },
+          "term_months": {
+            "type": "integer",
+            "title": "Term Months"
+          },
+          "interest_rate": {
+            "type": "string",
+            "title": "Interest Rate"
+          },
+          "monthly_payment": {
+            "type": "string",
+            "title": "Monthly Payment"
+          },
+          "disbursed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disbursed At"
+          },
+          "maturity_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Maturity Date"
+          },
+          "outstanding_balance": {
+            "type": "string",
+            "title": "Outstanding Balance"
+          },
+          "next_payment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PaymentScheduleItemRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "application_id",
+          "contract_number",
+          "status",
+          "principal_amount",
+          "term_months",
+          "interest_rate",
+          "monthly_payment",
+          "disbursed_at",
+          "maturity_date",
+          "outstanding_balance",
+          "next_payment"
+        ],
+        "title": "LoanShort",
+        "description": "Кредит в списке «Кредиты»: остаток и ближайший платёж считаются из графика."
       },
       "LoginRequest": {
         "properties": {
@@ -5890,6 +6382,58 @@
         ],
         "title": "Page[NotificationRead]"
       },
+      "PaymentScheduleItemRead": {
+        "properties": {
+          "installment_no": {
+            "type": "integer",
+            "title": "Installment No"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Due Date"
+          },
+          "principal_amount": {
+            "type": "string",
+            "title": "Principal Amount"
+          },
+          "interest_amount": {
+            "type": "string",
+            "title": "Interest Amount"
+          },
+          "total_amount": {
+            "type": "string",
+            "title": "Total Amount"
+          },
+          "balance_after": {
+            "type": "string",
+            "title": "Balance After"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PaymentStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "installment_no",
+          "due_date",
+          "principal_amount",
+          "interest_amount",
+          "total_amount",
+          "balance_after",
+          "status"
+        ],
+        "title": "PaymentScheduleItemRead"
+      },
+      "PaymentStatus": {
+        "type": "string",
+        "enum": [
+          "scheduled",
+          "paid",
+          "overdue"
+        ],
+        "title": "PaymentStatus"
+      },
       "PhoneLoginRequest": {
         "properties": {
           "phone": {
@@ -6156,6 +6700,14 @@
         },
         "type": "object",
         "title": "RejectOfferRequest"
+      },
+      "RepaymentType": {
+        "type": "string",
+        "enum": [
+          "annuity",
+          "differentiated"
+        ],
+        "title": "RepaymentType"
       },
       "RiskGrade": {
         "type": "string",
