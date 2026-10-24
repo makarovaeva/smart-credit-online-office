@@ -1,0 +1,13 @@
+# Track sources and example fixtures, not generated experiments.
+data/*
+!data/.gitkeep
+example_data/
+example_outputs/
+.venv/
+.ipynb_checkpoints/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*.joblib
+*.cbm
+*.lgb.txt

@@ -1,0 +1,326 @@
+{
+  "contract_version": "1.0.0",
+  "purpose": "Pre-decision SME default scoring — educational synthetic demo",
+  "implementation": "ml/scoring/train_scoring.py::extract_features",
+  "target": {
+    "name": "default_12m",
+    "values": [
+      0,
+      1
+    ],
+    "meaning": "Hypothetical or observed default within 12 months, depending on label source",
+    "is_feature": false
+  },
+  "identifiers": {
+    "application_id": "join/split only, never a predictor",
+    "borrower_id": "group splitting only, never a predictor"
+  },
+  "categorical_features": [
+    "legal_form",
+    "okved_section",
+    "credit_history_quality",
+    "loan_purpose",
+    "collateral_type",
+    "repayment_type"
+  ],
+  "numerical_features": [
+    "age_months",
+    "employees_count",
+    "log_annual_turnover",
+    "ebitda_margin_pct",
+    "revenue_change_pct",
+    "negative_cf_months",
+    "negative_cf_streak",
+    "cf_net_to_turnover",
+    "active_loans_count",
+    "debt_to_turnover",
+    "debt_service_to_turnover",
+    "overdue_to_turnover",
+    "max_overdue_days_12m",
+    "tax_arrears_to_turnover",
+    "has_tax_activity",
+    "loan_to_turnover",
+    "loan_amount_log",
+    "term_months",
+    "indicative_rate_pct",
+    "has_collateral",
+    "collateral_coverage",
+    "requested_payment_to_turnover"
+  ],
+  "features_order": [
+    "legal_form",
+    "okved_section",
+    "credit_history_quality",
+    "loan_purpose",
+    "collateral_type",
+    "repayment_type",
+    "age_months",
+    "employees_count",
+    "log_annual_turnover",
+    "ebitda_margin_pct",
+    "revenue_change_pct",
+    "negative_cf_months",
+    "negative_cf_streak",
+    "cf_net_to_turnover",
+    "active_loans_count",
+    "debt_to_turnover",
+    "debt_service_to_turnover",
+    "overdue_to_turnover",
+    "max_overdue_days_12m",
+    "tax_arrears_to_turnover",
+    "has_tax_activity",
+    "loan_to_turnover",
+    "loan_amount_log",
+    "term_months",
+    "indicative_rate_pct",
+    "has_collateral",
+    "collateral_coverage",
+    "requested_payment_to_turnover"
+  ],
+  "features": [
+    {
+      "name": "legal_form",
+      "kind": "categorical",
+      "dtype": "string",
+      "source": "company.legal_form",
+      "definition": "ООО / ИП",
+      "nullable": false
+    },
+    {
+      "name": "okved_section",
+      "kind": "categorical",
+      "dtype": "string",
+      "source": "company.okved_main.code",
+      "definition": "Первые две цифры кода ОКВЭД",
+      "nullable": false
+    },
+    {
+      "name": "credit_history_quality",
+      "kind": "categorical",
+      "dtype": "string",
+      "source": "bki_data.credit_history_quality",
+      "definition": "Категория качества БКИ",
+      "nullable": false
+    },
+    {
+      "name": "loan_purpose",
+      "kind": "categorical",
+      "dtype": "string",
+      "source": "application.purpose.category",
+      "definition": "Цель кредита",
+      "nullable": false
+    },
+    {
+      "name": "collateral_type",
+      "kind": "categorical",
+      "dtype": "string",
+      "source": "application.collateral.type",
+      "definition": "Тип залога",
+      "nullable": false
+    },
+    {
+      "name": "repayment_type",
+      "kind": "categorical",
+      "dtype": "string",
+      "source": "application.loan_request.repayment_type",
+      "definition": "Тип графика погашения",
+      "nullable": false
+    },
+    {
+      "name": "age_months",
+      "kind": "numeric",
+      "dtype": "finite_number",
+      "source": "company.registration_date, application.created_at",
+      "definition": "Полных месяцев со дня регистрации до заявки",
+      "nullable": false
+    },
+    {
+      "name": "employees_count",
+      "kind": "numeric",
+      "dtype": "finite_number",
+      "source": "company.employees_count",
+      "definition": "Количество сотрудников, человек",
+      "nullable": false
+    },
+    {
+      "name": "log_annual_turnover",
+      "kind": "numeric",
+      "dtype": "finite_number",
+      "source": "financials.annual_turnover",
+      "definition": "log1p(годового оборота в ₽)",
+      "nullable": false
+    },
+    {
+      "name": "ebitda_margin_pct",
+      "kind": "numeric",
+      "dtype": "finite_number",
+      "source": "financials.ebitda, financials.annual_turnover",
+      "definition": "100 × EBITDA / годовой оборот; проценты",
+      "nullable": false
+    },
+    {
+      "name": "revenue_change_pct",
+      "kind": "numeric",
+      "dtype": "finite_number",
+      "source": "financials.revenue_change_pct",
+      "definition": "Изменение выручки, процентные пункты",
+      "nullable": false
+    },
+    {
+      "name": "negative_cf_months",
+      "kind": "numeric",
+      "dtype": "finite_number",
+      "source": "financials.cash_flow_last_12m",
+      "definition": "Число отрицательных месяцев из последних 12",
+      "nullable": false
+    },
+    {
+      "name": "negative_cf_streak",
+      "kind": "numeric",
+      "dtype": "finite_number",
+      "source": "financials.cash_flow_last_12m",
+      "definition": "Максимум отрицательных месяцев подряд",
+      "nullable": false
+    },
+    {
+      "name": "cf_net_to_turnover",
+      "kind": "numeric",
+      "dtype": "finite_number",
+      "source": "financials.cash_flow_last_12m, annual_turnover",
+      "definition": "Сумма денежных потоков за 12 месяцев / оборот",
+      "nullable": false
+    },
+    {
+      "name": "active_loans_count",
+      "kind": "numeric",
+      "dtype": "finite_number",
+      "source": "bki_data.active_loans_count",
+      "definition": "Количество действующих кредитов",
+      "nullable": false
+    },
+    {
+      "name": "debt_to_turnover",
+      "kind": "numeric",
+      "dtype": "finite_number",
+      "source": "bki_data.total_debt_amount, annual_turnover",
+      "definition": "Остаток долга / оборот",
+      "nullable": false
+    },
+    {
+      "name": "debt_service_to_turnover",
+      "kind": "numeric",
+      "dtype": "finite_number",
+      "source": "bki_data.monthly_debt_service, annual_turnover",
+      "definition": "12 × ежемесячное обслуживание текущего долга / оборот",
+      "nullable": false
+    },
+    {
+      "name": "overdue_to_turnover",
+      "kind": "numeric",
+      "dtype": "finite_number",
+      "source": "bki_data.overdue_amount, annual_turnover",
+      "definition": "Просроченная сумма / оборот",
+      "nullable": false
+    },
+    {
+      "name": "max_overdue_days_12m",
+      "kind": "numeric",
+      "dtype": "finite_number",
+      "source": "bki_data.max_overdue_days_12m",
+      "definition": "Максимальная просрочка за год, дней",
+      "nullable": false
+    },
+    {
+      "name": "tax_arrears_to_turnover",
+      "kind": "numeric",
+      "dtype": "finite_number",
+      "source": "fns_data.tax_arrears_amount, annual_turnover",
+      "definition": "Налоговая задолженность / оборот",
+      "nullable": false
+    },
+    {
+      "name": "has_tax_activity",
+      "kind": "numeric",
+      "dtype": "finite_number",
+      "source": "fns_data.has_tax_activity",
+      "definition": "1 при налоговой активности, иначе 0",
+      "nullable": false
+    },
+    {
+      "name": "loan_to_turnover",
+      "kind": "numeric",
+      "dtype": "finite_number",
+      "source": "application.loan_request.amount, annual_turnover",
+      "definition": "Сумма заявки / оборот",
+      "nullable": false
+    },
+    {
+      "name": "loan_amount_log",
+      "kind": "numeric",
+      "dtype": "finite_number",
+      "source": "application.loan_request.amount",
+      "definition": "log1p(суммы кредита в ₽)",
+      "nullable": false
+    },
+    {
+      "name": "term_months",
+      "kind": "numeric",
+      "dtype": "finite_number",
+      "source": "application.loan_request.term_months",
+      "definition": "Срок запрошенного кредита, месяцев",
+      "nullable": false
+    },
+    {
+      "name": "indicative_rate_pct",
+      "kind": "numeric",
+      "dtype": "finite_number",
+      "source": "application.pre_approval.indicative_rate_pct",
+      "definition": "Индикативная ставка в процентах годовых",
+      "nullable": false
+    },
+    {
+      "name": "has_collateral",
+      "kind": "numeric",
+      "dtype": "finite_number",
+      "source": "application.collateral.market_value",
+      "definition": "1, если известна рыночная стоимость залога, иначе 0",
+      "nullable": false
+    },
+    {
+      "name": "collateral_coverage",
+      "kind": "numeric",
+      "dtype": "finite_number",
+      "source": "application.collateral.market_value, loan_request.amount",
+      "definition": "Рыночная стоимость залога / сумма заявки, 0 если нет залога",
+      "nullable": false
+    },
+    {
+      "name": "requested_payment_to_turnover",
+      "kind": "numeric",
+      "dtype": "finite_number",
+      "source": "loan_request, pre_approval, annual_turnover",
+      "definition": "12 × расчётный платёж по заявке / оборот",
+      "nullable": false
+    }
+  ],
+  "input_requirements": [
+    "Borrower Profile and Loan Application must be linkable by borrower_id.",
+    "Application must have status=application_submitted and current_assessment_id=null.",
+    "financials.as_of_date <= application.created_at.",
+    "company.registration_date <= application.created_at.",
+    "financials.annual_turnover must be positive and finite.",
+    "financials.cash_flow_last_12m must contain 12 finite values.",
+    "Every numeric derived feature must be finite; missing features currently cause an error.",
+    "Source timestamps of BKI/FNS/compliance SHOULD be audited for pre-application availability; not universally enforced by extract_features yet."
+  ],
+  "forbidden_predictors": [
+    "default_12m",
+    "simulator_probability",
+    "assessment.route",
+    "assessment.ai_scoring.risk_score",
+    "application.current_assessment_id",
+    "approval_decision",
+    "future_repayment_outcomes"
+  ],
+  "compatibility_note": "This JSON documents the implemented feature allowlist. It is checked against trainer constants by unit test, but no production inference endpoint enforces it yet."
+}
