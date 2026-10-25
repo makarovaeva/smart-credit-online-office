@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { apiUrl, sameOrigin, serverApi, sessionCookie } from "@/lib/server-api";
+import { apiUrl, requestOrigin, sameOrigin, serverApi, sessionCookie } from "@/lib/server-api";
 
 export async function GET() {
   try {
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     const data = await response.json();
     if (!response.ok) return NextResponse.json(data, { status: response.status });
     const result = NextResponse.json({ ok: true });
-    result.cookies.set(sessionCookie, data.access_token, { httpOnly: true, sameSite: "lax", path: "/", maxAge: data.expires_in, secure: new URL(request.url).protocol === "https:" });
+    result.cookies.set(sessionCookie, data.access_token, { httpOnly: true, sameSite: "lax", path: "/", maxAge: data.expires_in, secure: requestOrigin(request).startsWith("https:") });
     return result;
   } catch { return NextResponse.json({ detail: "Backend недоступен" }, { status: 503 }); }
 }

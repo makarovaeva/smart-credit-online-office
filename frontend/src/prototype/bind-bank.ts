@@ -1,7 +1,13 @@
 import { list, object, str, type ObjectData } from "@/lib/api";
 import type { BankState } from "./use-bank";
 
-export const money = (value: unknown) => value === undefined || value === null ? "—" : new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(value));
+// Целые суммы - без копеек («3 000 000 ₽»), с копейками - всегда два знака («44 773,10 ₽»)
+export const money = (value: unknown) => {
+  if (value === undefined || value === null) return "—";
+  const amount = Number(value);
+  const digits = Number.isInteger(amount) ? 0 : 2;
+  return new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", minimumFractionDigits: digits, maximumFractionDigits: 2 }).format(amount);
+};
 const date = (value: unknown) => value ? new Date(String(value)).toLocaleDateString("ru-RU") : "—";
 const statuses: Record<string, string> = { draft: "Черновик", pre_approved: "Предварительное одобрение", underwriter_review: "Рассмотрение", analyst_escalation: "Эскалация аналитику", analyst_completed: "Заключение готово", need_additional_data: "Нужны документы", offer_generated: "Оффер сформирован", e_sign: "Договор на подписание", disbursement: "Выдача средств", completed: "Кредит выдан", closed: "Заявка закрыта" };
 Object.assign(statuses, { data_collection: "Сбор данных", submitted: "Заявка отправлена", ai_verification: "Проверка документов", ai_financial_analysis: "Финансовый анализ", ai_risk_scoring: "Оценка риска", decision_routing: "Маршрутизация заявки", offer_accepted: "Оффер принят", offer_rejected: "Оффер отклонён", contract_generation: "Подготовка договора", approved: "Одобрено", conditional_approval: "Одобрено с изменениями", declined: "Отказано", accepted: "Принят", rejected: "Отклонён", active: "Действует", green: "Зелёная зона", yellow: "Жёлтая зона", red: "Красная зона" });
@@ -117,14 +123,16 @@ export function bindBank(html: string, name: string, bank: BankState & { draft: 
 
   const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
   const texts: Text[] = []; let node; while ((node = walker.nextNode())) if (node.parentElement?.tagName !== "STYLE") texts.push(node as Text);
+  // На экранах кредита и графика - условия договора: после контр-предложения они отличаются от заявки
+  const loanTerms = (name.includes("Credits") || name.includes("Schedule")) && loan.term_months !== undefined;
   for (const text of texts) {
     let value = text.textContent ?? "";
     value = value.replaceAll("ООО «Вектор»", str(companyName));
     value = value.replace(/\[ФИО сотрудника\]/g, str(bank.user?.full_name));
     value = value.replace(/ММБ-2026-000(?:123|130)/g, str(app.number));
     value = value.replace(/№\[номер\]/g, `№${str(app.number)}`);
-    value = value.replace(/3 000 000 ₽/g, money(app.requested_amount ?? bank.draft.amount));
-    value = value.replace(/24 месяца/g, `${str(app.requested_term_months ?? bank.draft.term)} мес.`);
+    value = value.replace(/3 000 000 ₽/g, money(loanTerms ? loan.principal_amount : app.requested_amount ?? bank.draft.amount));
+    value = value.replace(/24 месяца/g, `${str(loanTerms ? loan.term_months : app.requested_term_months ?? bank.draft.term)} мес.`);
     value = value.replace(/\[[^\]]+\]/g, "—");
     text.textContent = value;
   }
@@ -179,6 +187,18 @@ export function bindBank(html: string, name: string, bank: BankState & { draft: 
         for (const value of [payment.installment_no, date(payment.due_date), money(payment.total_amount), money(payment.principal_amount), money(payment.interest_amount), money(payment.balance_after)]) { const td = doc.createElement("td"); td.style.padding = "10px 8px"; td.textContent = str(value); tr.append(td); }
         tbody.append(tr);
       }
+    }
+    // В макете три строки, в реальном графике до 120: окно не выше экрана, прокручивается только таблица
+    const dialog = doc.querySelector<HTMLElement>('[role="dialog"]');
+    const table = dialog?.querySelector("table");
+    if (dialog?.parentElement && table) {
+      Object.assign(dialog.parentElement.style, { position: "fixed", zIndex: "10", padding: "24px" });
+      Object.assign(dialog.style, { maxHeight: "calc(100vh - 48px)", maxWidth: "100%", boxSizing: "border-box" });
+      const scroll = doc.createElement("div");
+      Object.assign(scroll.style, { overflowY: "auto", minHeight: "0", flex: "1 1 auto" });
+      table.replaceWith(scroll);
+      scroll.append(table);
+      table.querySelectorAll<HTMLElement>("thead th").forEach(th => Object.assign(th.style, { position: "sticky", top: "0", background: "#fff" }));
     }
   }
 
