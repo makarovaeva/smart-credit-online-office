@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     # с открытыми весами (Ollama, llama.cpp server, vLLM), например http://ollama:11434/v1.
     # Не задан - ответы по шаблонам из данных заявки; при ошибке модели - тоже шаблоны
     llm_base_url: str | None = None
-    llm_model: str = "qwen2.5:3b-instruct"
+    llm_model: str = "qwen2.5:7b-instruct"
     llm_api_key: str | None = None
     llm_timeout_seconds: float = 30.0
 
