@@ -28,6 +28,7 @@ WORKDIR /app
 
 COPY --from=builder /opt/venv /opt/venv
 COPY --chown=app:app . .
+RUN sed -i 's/\r$//' scripts/entrypoint.sh
 
 USER app
 EXPOSE 8000

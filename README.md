@@ -33,6 +33,7 @@ docker compose up --build
 ```
 
 - API: http://localhost:8000, Swagger: http://localhost:8000/docs
+- Клиентский кабинет: http://localhost:3000 (вход — `/login`)
 - PostgreSQL: `localhost:5432` (`credit` / `credit`)
 
 Если порты заняты, поменяйте `BACKEND_PORT` и `POSTGRES_PORT` в `.env`.
@@ -46,7 +47,41 @@ docker compose up --build
 - базовые образы — точные теги: `python:3.12.15-slim`, `postgres:16.15-alpine`;
 - `uv` — `0.13.5`.
 
-Сервисы `frontend` и `ml` добавятся в `docker-compose.yml`, когда появятся в репозитории; шаблоны — в комментариях в файле.
+Frontend включён в Docker Compose. ML-сервис пока представлен шаблоном в комментариях.
+
+## Разработка frontend
+
+Стек: Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui. Версии зависимостей
+зафиксированы в `frontend/package.json` и `frontend/package-lock.json`; Node — в `.nvmrc` и Dockerfile.
+
+Для разработки с горячим обновлением остановите Docker-сервис frontend, если он запущен.
+БД и API можно оставить через `docker compose up --build -d backend`, затем:
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+Откройте http://localhost:3000/login. Разделы клиента: `/applications`, `/chat`,
+`/documents`, `/credits`, `/profile`. Входы сотрудников: `/staff/login?role=analyst`,
+`/staff/login?role=underwriter`, `/staff/login?role=admin`. Кабинеты:
+`/staff/analyst`, `/staff/underwriter`, `/staff/admin`.
+
+Frontend подключён к API: реальные входы, заявки, согласия, подача, статусы,
+очереди сотрудников, заключение аналитика, решения андеррайтера, офферы, подпись,
+договор и график. JWT хранится в HttpOnly cookie; данные запрашиваются через
+Next BFF. Статусы опрашиваются с backend, демонстрационных таймеров больше нет.
+Старые HTML-имена нормализуются в браузере, в ссылках интерфейса их нет.
+
+Чат и часть методов документов, дозапросов и профиля ещё не реализованы на backend.
+Они показаны как недоступные, без симуляции успеха. Доработки выполняет backend-команда.
+Точный статус и проверенные цепочки: `docs/frontend-api-status.md`.
+Список для команды: `docs/backend-integration-requests.md`.
+Расхождения макета и API перечислены в `docs/frontend-backend-gaps.md`.
+
+Проверки: `npm run typecheck` и `npm run build` из `frontend/`.
+Подробнее — `frontend/README.md`.
 
 ## Демо-доступ
 

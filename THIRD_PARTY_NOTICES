@@ -1,0 +1,26 @@
+Frontend components (initial implementation)
+============================================
+Next.js — MIT — https://github.com/vercel/next.js
+React / React DOM — MIT — https://github.com/facebook/react
+TypeScript — Apache-2.0 — https://github.com/microsoft/TypeScript
+Tailwind CSS — MIT — https://github.com/tailwindlabs/tailwindcss
+shadcn/ui — MIT — https://github.com/shadcn-ui/ui
+Base UI — MIT — https://github.com/mui/base-ui
+Lucide — ISC — https://github.com/lucide-icons/lucide
+class-variance-authority — Apache-2.0 — https://github.com/joe-bell/cva
+cn — MIT — https://github.com/shadcn-ui/cn
+tw-animate-css — MIT — https://github.com/Wombosvideo/tw-animate-css
+server-only — MIT — https://www.npmjs.com/package/server-only
+ESLint — MIT — https://github.com/eslint/eslint
+
+Exact direct and transitive versions are recorded in frontend/package-lock.json.
+Upstream license files remain in the installed packages.
+
+Integration notes
+=================
+Company registry, tax, credit bureau and compliance integrations are simulated
+locally by backend/app/integrations. Demonstration data is synthetic.
+No external AI service is required by the current frontend implementation.
+
+Scope: this is the initial frontend inventory. Backend/ML component, model and
+dataset notices must be completed by their owners before hackathon submission.
