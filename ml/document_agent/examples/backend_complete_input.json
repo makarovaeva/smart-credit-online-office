@@ -1,0 +1,25 @@
+{
+  "application": {"id": "app-demo-1", "company_id": "co-demo-1", "requested_amount": 3000000},
+  "company": {"id": "co-demo-1", "inn": "7701234567", "legal_form": "ooo"},
+  "requirements": ["bank_statement", "financial_statements"],
+  "documents": [
+    {"id": "doc-bank-1", "application_id": "app-demo-1", "type": "bank_statement", "filename": "bank_statement.txt"},
+    {"id": "doc-fin-1", "application_id": "app-demo-1", "type": "financial_statements", "filename": "financial_statements.txt"}
+  ],
+  "mock_text_by_id": {
+    "doc-bank-1": "Выписка с расчётного счёта\nИНН 7701234567\nПоступления за 2025 год 18000000 рублей.",
+    "doc-fin-1": "Бухгалтерская отчётность\nИНН 7701234567\nГодовая выручка 18000000 рублей."
+  },
+  "mock_responses": {
+    "doc-bank-1": {
+      "document_type": "bank_statement", "borrower_id": null,
+      "evidence": ["Выписка с расчётного счёта"],
+      "requires_review": false
+    },
+    "doc-fin-1": {
+      "document_type": "financial_statements", "borrower_id": null,
+      "evidence": ["Бухгалтерская отчётность"],
+      "requires_review": false
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "application": {
+    "application_id": "app_DEMO_001",
+    "borrower_id": "borrower_DEMO_001",
+    "loan_request": {"amount": 1500000, "term_months": 24},
+    "collateral": {"type": "none"}
+  },
+  "borrower": {
+    "borrower_id": "borrower_DEMO_001",
+    "company": {"legal_form": "ooo"}
+  },
+  "documents": [
+    {
+      "document_id": "doc_reg",
+      "filename": "egrul_extract.txt",
+      "text": "Сведения из ЕГРЮЛ. ООО Демонстрация. borrower_DEMO_001. Дата выдачи: 20.10.2026."
+    },
+    {
+      "document_id": "doc_bank",
+      "filename": "bank_statement.txt",
+      "text": "Выписка по расчётному счёту. ООО Демонстрация. borrower_DEMO_001. Поступления: 1000000 рублей."
+    }
+  ],
+  "mock_responses": {
+    "doc_reg": {
+      "document_type": "registration_extract",
+      "borrower_id": "borrower_DEMO_001",
+      "evidence": ["Сведения из ЕГРЮЛ"],
+      "requires_review": false
+    },
+    "doc_bank": {
+      "document_type": "bank_statement",
+      "borrower_id": "borrower_DEMO_001",
+      "evidence": ["Выписка по расчётному счёту"],
+      "requires_review": false
+    }
+  }
+}
