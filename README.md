@@ -130,6 +130,7 @@ flowchart LR
 
 | Что | Где |
 |---|---|
+| Продуктовый анализ: исследование пользователей, клиентский путь, гипотеза и метрики, ключевой сценарий, кредитная логика | [Figma](https://www.figma.com/design/YxuiZBnCIsE7KvlEfopo3i/%D0%A5%D0%B0%D0%BA%D0%B0%D1%82%D0%BE%D0%BD-%D0%90%D0%BB%D1%8C%D1%84%D0%B0-%D0%91%D1%83%D0%B4%D1%83%D1%89%D0%B5%D0%B5-26?node-id=0-1&t=zeuDaEfI3XuEB9Lw-1) |
 | Архитектура: компоненты, слои backend, конвейер, безопасность, развёртывание | [`docs/architecture.md`](docs/architecture.md) |
 | Тестовые сценарии: шаги, ожидаемый результат, покрытие автотестами | [`docs/test-scenarios.md`](docs/test-scenarios.md) |
 | Жизненный цикл заявки, диаграмма состояний, кредитная политика, конвейер, выдача | [`docs/application-lifecycle.md`](docs/application-lifecycle.md) |
