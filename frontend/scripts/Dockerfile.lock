@@ -1,0 +1,8 @@
+# Recreate a cross-platform lock without an existing host node_modules tree.
+FROM node:24.22.1-alpine AS lock
+WORKDIR /app
+COPY package.json ./
+RUN npm install --package-lock-only --ignore-scripts
+
+FROM scratch
+COPY --from=lock /app/package-lock.json /package-lock.json

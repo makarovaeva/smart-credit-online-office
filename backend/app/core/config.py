@@ -22,8 +22,11 @@ class Settings(BaseSettings):
     # ФНС и БКИ. ИНН, которых в датасете нет, генерируются на лету
     borrower_dataset_path: str | None = None
 
-    # Реализация скоринга из services/scoring.py; модель ML подключается сюда
+    # Реализация скоринга из services/scoring.py: rules - правила, ml - сервис ML
     scoring_model: str = "rules"
+    # Сервис инференса ML (ml/service); при недоступности скоринг откатывается на правила
+    ml_service_url: str = "http://ml:8000"
+    ml_timeout_seconds: float = 10.0
 
     # Срок действия оффера на доске не задан - открытый вопрос
     offer_validity_days: int = 30

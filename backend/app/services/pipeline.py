@@ -12,11 +12,14 @@
 
 import logging
 from dataclasses import replace
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.integrations.dataset import BorrowerProfile
 from app.models import (
     Application,
     CreditMemo,
@@ -28,9 +31,12 @@ from app.models import (
 from app.models.enums import (
     ActorType,
     ApplicationStatus,
+    CheckSource,
     CloseReason,
+    CollateralType,
     DocumentType,
     EscalationReasonCode,
+    LoanPurpose,
     RiskGrade,
     RiskZone,
 )
@@ -41,9 +47,13 @@ from app.services.credit_policy import (
     PolicyResult,
     evaluate,
 )
-from app.services.enrichment import application_features, collect_external_data
+from app.services.enrichment import (
+    application_features,
+    collect_external_data,
+    latest_results,
+)
 from app.services.features import Features
-from app.services.scoring import ScoringOutput, get_scoring_model
+from app.services.scoring import ScoringContext, ScoringOutput, get_scoring_model
 from app.services.transitions import transition
 
 logger = logging.getLogger(__name__)
@@ -101,12 +111,80 @@ def _policy_input(
     )
 
 
+# Справочники контракта ML (docs/credit_mmb_data_model_updated.md), прочее - other
+ML_PURPOSES = {LoanPurpose.WORKING_CAPITAL: "working_capital", LoanPurpose.EQUIPMENT: "equipment"}
+ML_COLLATERAL = {
+    CollateralType.COMMERCIAL_REAL_ESTATE: "real_estate",
+    CollateralType.RESIDENTIAL_REAL_ESTATE: "real_estate",
+    CollateralType.VEHICLE: "vehicle",
+    CollateralType.EQUIPMENT: "equipment",
+}
+
+
+def _scoring_context(
+    application: Application, results: dict[CheckSource, dict[str, Any]], rate: Decimal
+) -> ScoringContext:
+    """Профиль и заявка в формате контракта ML; без любого из источников - пустой контекст."""
+    try:
+        blocks = [
+            results[s]
+            for s in (CheckSource.EGRUL, CheckSource.FNS, CheckSource.BKI, CheckSource.COMPLIANCE)
+        ]
+    except KeyError:
+        return ScoringContext()
+    raw = {"borrower_id": f"brw_{blocks[0]['company']['inn']}"}
+    for block in blocks:
+        raw |= block
+    profile = BorrowerProfile.model_validate(raw).model_dump()
+    collateral = application.collateral_type if application.has_collateral else None
+    return ScoringContext(
+        profile=profile,
+        application={
+            "application_id": str(application.id),
+            "borrower_id": profile["borrower_id"],
+            "status": "application_submitted",
+            "current_assessment_id": None,
+            "created_at": datetime.now(UTC).isoformat(),
+            "loan_request": {
+                "amount": application.requested_amount,
+                "currency": "RUB",
+                "term_months": application.requested_term_months,
+                "repayment_type": "annuity",
+            },
+            "purpose": {"category": ML_PURPOSES.get(application.purpose, "other")},
+            "collateral": {
+                "type": ML_COLLATERAL.get(collateral, "other") if collateral else "none",
+                "market_value": application.collateral_market_value if collateral else None,
+            },
+            "pre_approval": {"indicative_rate_pct": rate},
+        },
+    )
+
+
+async def _indicative_rate(
+    session: AsyncSession, application: Application, product: CreditProduct
+) -> Decimal:
+    """Ставка из предварительного расчёта, до него - базовая ставка продукта."""
+    rate = await session.scalar(
+        select(PreApproval.estimated_rate)
+        .where(PreApproval.application_id == application.id)
+        .order_by(PreApproval.created_at.desc())
+        .limit(1)
+    )
+    return rate or product.base_rate
+
+
 async def _assess(
     session: AsyncSession, application: Application, product: CreditProduct
 ) -> tuple[Features, ScoringOutput, PolicyResult | None]:
     await collect_external_data(session, application)
     features = await application_features(session, application)
-    scoring = await get_scoring_model().score(features.values)
+    context = _scoring_context(
+        application,
+        await latest_results(session, application.id),
+        await _indicative_rate(session, application, product),
+    )
+    scoring = await get_scoring_model().score(features.values, context)
     data = _policy_input(application, product, features, scoring)
     return features, scoring, evaluate(data) if data else None
 

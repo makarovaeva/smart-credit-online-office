@@ -1,29 +1,15 @@
-# smart-credit-online-office
+# Умный кредитный кабинет предпринимателя
 
-Умный кредитный кабинет предпринимателя — цифровой кредитный конвейер для малого и микробизнеса (Альфа-Хак 2026).
+Цифровой кредитный конвейер для малого и микробизнеса (Альфа-Хак 2026). Клиентский путь от потребности в финансировании до выдачи и внутренняя обработка заявки банком — в одном продукте:
 
-## Структура репозитория
+- **клиент** входит по номеру телефона, оформляет заявку, видит предварительный расчёт, получает оффер или контр-предложение, подписывает договор и видит график платежей;
+- **ИИ-конвейер** собирает данные о бизнесе, считает скоринг, применяет кредитную политику и маршрутизирует заявку: андеррайтеру, кредитному аналитику или в автоотказ;
+- **кредитный аналитик** разбирает сложные случаи и пишет заключение;
+- **андеррайтер** принимает финальное решение: одобрение, контр-предложение, отказ или запрос данных.
 
-```
-backend/    Python API (FastAPI, SQLAlchemy 2 async, Alembic, PostgreSQL)
-  app/
-    api/           HTTP-роутеры (версионируются: api/v1)
-    core/          конфигурация
-    db/            engine, сессии, Base
-    models/        ORM-модели
-    schemas/       Pydantic-схемы запросов/ответов
-    services/      бизнес-логика (конвейер, скоринг, кредитное решение)
-    integrations/  моки внешних сервисов (ЕГРЮЛ/ЕГРИП, ФНС, БКИ, комплаенс)
-  migrations/      миграции Alembic
-  scripts/         демо-данные, запуск контейнера, экспорт OpenAPI
-  tests/
-frontend/   веб-клиент
-data/       датасет профилей заёмщиков от ML (монтируется в backend)
-docs/       архитектура, API, диаграмма состояний, модель данных
-docker-compose.yml, .env.example   единый запуск решения
-```
+Внешние системы (ЕГРЮЛ, ФНС, БКИ, комплаенс) заменены локальными моками, данные синтетические. Подписание и выдача средств — симуляция.
 
-## Запуск
+## Быстрый старт
 
 Нужен только Docker с Compose v2. Из корня репозитория:
 
@@ -32,37 +18,34 @@ cp .env.example .env    # необязательно: без .env работаю
 docker compose up --build
 ```
 
-- API: http://localhost:8000, Swagger: http://localhost:8000/docs
-- PostgreSQL: `localhost:5432` (`credit` / `credit`)
+Первая сборка занимает несколько минут: собираются четыре образа, а модель скоринга обучается при сборке образа `ml`. Сервисы готовы, когда `docker compose ps` показывает у всех `healthy`.
 
-Если порты заняты, поменяйте `BACKEND_PORT` и `POSTGRES_PORT` в `.env`.
+| Сервис | Адрес | Что это |
+|---|---|---|
+| `frontend` | http://localhost:3000/login, сотрудники — http://localhost:3000/staff/login | Кабинет клиента и рабочие места сотрудников (Next.js) |
+| `backend` | http://localhost:8000, Swagger — http://localhost:8000/docs | API и кредитный конвейер (FastAPI) |
+| `ml` | только внутри сети compose | Скоринг: вероятность дефолта и SHAP-факторы (CatBoost) |
+| `db` | `localhost:5432` (`credit` / `credit`) | PostgreSQL |
 
-При старте backend накатывает миграции и загружает демо-данные (`scripts/seed.py`, идемпотентно; отключается `SEED_DEMO_DATA=false`). Данные БД хранятся в volume `postgres_data`. Начать с чистой базы: `docker compose down -v`.
-
-Датасет профилей заёмщиков от ML кладётся в `data/` и подключается переменной `BORROWER_DATASET_PATH` (см. [`data/README.md`](data/README.md)).
-
-**Фиксация версий:**
-- зависимости backend — `backend/uv.lock`; образ собирается с `uv sync --locked`, поэтому сборка падает, если lock отстал от `pyproject.toml`;
-- базовые образы — точные теги: `python:3.12.15-slim`, `postgres:16.15-alpine`;
-- `uv` — `0.13.5`.
-
-Сервисы `frontend` и `ml` добавятся в `docker-compose.yml`, когда появятся в репозитории; шаблоны — в комментариях в файле.
+- Если порт занят (например, 5432 — локальным PostgreSQL), поменяйте `FRONTEND_PORT`, `BACKEND_PORT` или `POSTGRES_PORT` в `.env`.
+- При старте backend накатывает миграции и загружает демо-данные (идемпотентно; отключается `SEED_DEMO_DATA=false`).
+- Данные хранятся в volume `postgres_data`. Начать с чистой базы: `docker compose down -v`.
 
 ## Демо-доступ
 
 Регистрации нет: по условиям кейса пользователь уже клиент банка, а учётные записи сотрудников заведены заранее.
 
-**Клиенты** входят по номеру телефона, без пароля и SMS: `POST /api/v1/auth/login/phone`.
+**Клиенты** входят по номеру телефона, без пароля и SMS:
 
 | Телефон | Компания (ИНН) | Что произойдёт с заявкой на оборотный кредит |
 |---|---|---|
-| `+7 999 000-00-01` | `7701000001` | Здоровая компания: андеррайтеру, одобрение |
-| `+7 999 000-00-02` | `7701000018` | 5 млн — пограничный риск: контр-предложение с вариантами |
-| `+7 999 000-00-03` | `7701000002` | Действующее банкротство: автоотказ |
-| `+7 999 000-00-04` | `7701000007` | Бизнесу 7 месяцев: к кредитному аналитику |
+| `+7 999 000-00-01` | `7701000001` | Здоровая компания → андеррайтер → одобрение |
+| `+7 999 000-00-02` | `7701000018` | 5 млн — пограничный риск → контр-предложение с вариантами |
+| `+7 999 000-00-03` | `7701000002` | Действующее банкротство → автоотказ с причиной |
+| `+7 999 000-00-04` | `7701000007` | Бизнесу 7 месяцев → кредитный аналитик |
 | `+7 999 000-00-05` | `770100000001` | ИП, здоровый бизнес |
 
-**Сотрудники** входят по логину и паролю: `POST /api/v1/auth/login`, пароль у всех `demo-password`.
+**Сотрудники** входят по логину и паролю, пароль у всех `demo-password`:
 
 | Логин | Роль |
 |---|---|
@@ -70,24 +53,168 @@ docker compose up --build
 | `underwriter1@alfa-demo.ru`, `underwriter2@alfa-demo.ru` | Андеррайтер |
 | `admin@alfa-demo.ru` | Администратор: видит все заявки |
 
-Заявка назначается автоматически: в жёлтой зоне — аналитику, на рассмотрение — андеррайтеру. Каждый сотрудник видит свои заявки в `GET /api/v1/backoffice/applications` с фильтром `?status=`.
+Заявка назначается автоматически сотруднику с меньшей загрузкой: в жёлтой зоне — аналитику, на рассмотрение — андеррайтеру. Если заявки нет в очереди `underwriter1`, она у `underwriter2` (у аналитиков так же). Администратор видит все заявки.
 
-## Локальная разработка backend
+## Проверка сценариев
 
-Требуется [uv](https://docs.astral.sh/uv/), Python 3.12.
+### Вручную в интерфейсе
+
+1. **Одобрение и выдача** (`+7 999 000-00-01`):
+   - клиент оформляет заявку, даёт согласия, видит предварительный расчёт и подаёт;
+   - андеррайтер открывает заявку в очереди (скоринг, AI Credit Memo) и одобряет;
+   - клиент принимает оффер и подписывает;
+   - в «Кредитах» появляются договор и график платежей.
+2. **Контр-предложение** (`+7 999 000-00-02`, 5 млн):
+   - в карточке у андеррайтера рекомендация ИИ «контр-предложение» и альтернативные варианты: дольше срок, меньше сумма, максимальный срок;
+   - андеррайтер отправляет контр-предложение, клиент видит изменённые условия.
+3. **Автоотказ** (`+7 999 000-00-03`): после подачи заявка сразу закрывается, клиент видит отказ и причину.
+4. **Эскалация** (`+7 999 000-00-04`): заявка уходит аналитику, его заключение возвращает её андеррайтеру.
+
+### Автоматически
+
+**API — Postman-коллекция** с теми же сценариями и ошибками 401/403/404/409/422 (подробнее — [`docs/postman/`](docs/postman/README.md)):
 
 ```bash
-cd backend
+docker run --rm -v "$PWD/docs/postman":/etc/newman postman/newman:6-alpine \
+  run smart-credit.postman_collection.json -e smart-credit.local.postman_environment.json \
+  --env-var baseUrl=http://host.docker.internal:8000/api/v1
+```
+
+**Интерфейс в браузере** — сквозной тест через формы: клиент → андеррайтер → клиент, автоотказ, эскалация, администратор. Нужен Chrome с отладочным портом; тест создаёт синтетические заявки, запускать только на демо-базе.
+
+```bash
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new \
+  --remote-debugging-port=9223 --user-data-dir=/tmp/sco-chrome about:blank &
+cd frontend && node scripts/check-connected.mjs
+```
+
+## Как устроено
+
+```mermaid
+flowchart LR
+    U[Клиент / сотрудник<br/>браузер] --> FE[frontend<br/>Next.js + BFF]
+    FE -->|JWT в HttpOnly-cookie| BE[backend<br/>FastAPI]
+    BE --> DB[(db<br/>PostgreSQL)]
+    BE -->|скоринг| ML[ml<br/>CatBoost + SHAP]
+    BE --> MOCK[моки внешних источников<br/>ЕГРЮЛ · ФНС · БКИ · комплаенс]
+```
+
+Кредитный конвейер в backend:
+
+```mermaid
+flowchart LR
+    A[Согласия] --> B[Сбор данных<br/>из источников]
+    B --> C[Предварительный<br/>расчёт]
+    C --> D[Подача]
+    D --> E[Скоринг ML<br/>+ кредитная политика]
+    E -->|стоп-фактор| X[Автоотказ]
+    E -->|основание эскалации| F[Кредитный аналитик]
+    E -->|зелёная зона| G[Андеррайтер]
+    F --> G
+    G --> H[Оффер /<br/>контр-предложение]
+    H --> I[Договор,<br/>подписание, выдача]
+```
+
+- **Скоринг** (`ml`) даёт калиброванную вероятность дефолта и объясняющие факторы. Из них получаются балл и грейд A–E. Если сервис недоступен, backend считает скоринг по встроенным правилам — сценарий не прерывается.
+- **Кредитная политика** (backend):
+  - стоп-факторы ведут к автоотказу;
+  - основания эскалации отправляют заявку аналитику;
+  - проверки зелёной зоны: лимит, DSCR, LTV;
+  - контр-предложения: снижение до лимита, продление срока, снижение суммы, риск-надбавка; рядом — альтернативные варианты условий.
+- **Финальное решение** по заявке всегда принимает андеррайтер. Автоматически заявка закрывается только по стоп-фактору.
+
+## Документация
+
+| Что | Где |
+|---|---|
+| Жизненный цикл заявки, диаграмма состояний, кредитная политика, конвейер, выдача | [`docs/application-lifecycle.md`](docs/application-lifecycle.md) |
+| Модель данных (ER-диаграмма) | [`docs/data-model.md`](docs/data-model.md) |
+| Целевая модель данных MVP (профиль заёмщика, заявка, оценка, оффер, договор) | [`docs/credit_mmb_data_model_updated.md`](docs/credit_mmb_data_model_updated.md) |
+| Описание API и соглашения | [`docs/api/README.md`](docs/api/README.md) |
+| OpenAPI 3.1 | [`docs/api/openapi.json`](docs/api/openapi.json), [`docs/api/openapi.yaml`](docs/api/openapi.yaml) |
+| Postman-коллекция и окружение | [`docs/postman/`](docs/postman/README.md) |
+| Моки внешних источников, демо-ИНН, признаки заёмщика | [`docs/external-sources.md`](docs/external-sources.md) |
+| Frontend: маршруты и подключённые методы API | [`docs/frontend-api-status.md`](docs/frontend-api-status.md) |
+| ML: генератор синтетических данных | [`ml/synthetic_data/README.md`](ml/synthetic_data/README.md) |
+| ML: скоринг и контракт признаков | [`ml/scoring/README.md`](ml/scoring/README.md), [`ml/scoring/FEATURE_CONTRACT.md`](ml/scoring/FEATURE_CONTRACT.md) |
+| Сторонние компоненты и лицензии | [`THIRD_PARTY_NOTICES`](THIRD_PARTY_NOTICES) |
+
+## Структура репозитория
+
+```
+backend/             API и кредитный конвейер (Python 3.12, FastAPI, SQLAlchemy 2 async, Alembic)
+  app/
+    api/v1/          HTTP-роутеры
+    services/        бизнес-логика: конвейер, скоринг, кредитная политика, договор и выдача
+    integrations/    моки внешних источников и формат профиля заёмщика
+    models/, schemas/  ORM-модели и Pydantic-схемы
+  migrations/        миграции Alembic
+  scripts/           демо-данные, запуск контейнера, экспорт OpenAPI и Postman
+  tests/
+frontend/            кабинет клиента и рабочие места сотрудников (Next.js, TypeScript, Tailwind)
+ml/
+  synthetic_data/    генератор синтетических профилей и заявок
+  scoring/           обучение, калибровка, инференс и SHAP-объяснения скоринга
+  service/           HTTP-сервис инференса для backend
+data/                датасет профилей заёмщиков (монтируется в backend, см. data/README.md)
+docs/                документация, OpenAPI, Postman
+docker-compose.yml, .env.example   единый запуск решения
+```
+
+## Фиксация версий
+
+- **backend** — `backend/uv.lock`. Образ собирается с `uv sync --locked`, поэтому сборка падает, если lock отстал от `pyproject.toml`.
+- **ML-сервис** — `ml/service/requirements.lock`: все пакеты с хешами, `pip install --require-hashes`.
+- **frontend** — `frontend/package-lock.json` (`npm ci`), Node — `frontend/.nvmrc` и Dockerfile.
+- **Базовые образы** — точные теги: `python:3.12.15-slim`, `node:24.22.1-alpine`, `postgres:16.15-alpine`; `uv` — `0.13.5`.
+
+## Разработка
+
+### Backend
+
+Требуется [uv](https://docs.astral.sh/uv/) и Python 3.12. Из `backend/`:
+
+```bash
 uv sync
 uv run pytest
-uv run ruff check .
+uv run ruff check . && uv run ruff format .
 uv run uvicorn app.main:app --reload
 ```
 
-Тесты API работают с отдельной базой Postgres: схема накатывается миграциями, каждый тест откатывается. Без `TEST_DATABASE_URL` эти тесты пропускаются.
+- Тесты API работают с отдельной базой PostgreSQL: схема накатывается миграциями, каждый тест откатывается. Без `TEST_DATABASE_URL` эти тесты пропускаются:
+
+  ```bash
+  docker run -d --rm --name sco-pg-test -e POSTGRES_USER=credit -e POSTGRES_PASSWORD=credit \
+    -e POSTGRES_DB=credit_test -p 55432:5432 postgres:16.15-alpine
+  TEST_DATABASE_URL=postgresql+asyncpg://credit:credit@localhost:55432/credit_test uv run pytest
+  ```
+
+- После изменения API перегенерируйте спецификацию и коллекцию: `uv run python -m scripts.export_openapi` и `uv run python -m scripts.export_postman`. Тесты падают, если они отстали от кода.
+- Скоринг выбирается переменной `SCORING_MODEL`:
+  - `ml` — сервис `ml` (по умолчанию в Docker);
+  - `rules` — встроенные правила (по умолчанию при локальном запуске без Docker).
+
+### Frontend
+
+Стек: Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui. Для разработки с горячим обновлением остановите Docker-сервис `frontend`, оставьте API (`docker compose up -d backend`) и из `frontend/`:
 
 ```bash
-docker run -d --rm --name sco-pg-test -e POSTGRES_USER=credit -e POSTGRES_PASSWORD=credit \
-  -e POSTGRES_DB=credit_test -p 55432:5432 postgres:16-alpine
-TEST_DATABASE_URL=postgresql+asyncpg://credit:credit@localhost:55432/credit_test uv run pytest
+npm ci
+npm run dev
 ```
+
+- Проверки: `npm run typecheck` и `npm run build`.
+- Маршруты и подключённые методы API — [`docs/frontend-api-status.md`](docs/frontend-api-status.md), подробнее — [`frontend/README.md`](frontend/README.md).
+
+### ML
+
+- **Генератор синтетических данных:** `uv run --project backend --group ml python ml/synthetic_data/main.py …` — см. [`ml/synthetic_data/README.md`](ml/synthetic_data/README.md).
+- **Обучение и анализ скоринга** — см. [`ml/scoring/README.md`](ml/scoring/README.md).
+- **Датасет профилей** для backend кладётся в `data/` и подключается переменной `BORROWER_DATASET_PATH` — см. [`data/README.md`](data/README.md). Без датасета моки генерируют данные сами, демо-ИНН — в [`docs/external-sources.md`](docs/external-sources.md).
+
+## Что пока не реализовано
+
+- **Чат с ИИ-агентом.** В интерфейсе показан как недоступный; заявка оформляется формой.
+- **Документы клиента.** Загрузка и скачивание документов, ответы на дозапросы, запрос документов аналитиком — в API объявлены, но отвечают `501`.
+- **Полный профиль компании** (`/companies/{id}`).
+- **Модель скоринга** обучена на синтетических метках дефолта: это демонстрация подхода, а не проверенная вероятность дефолта.
