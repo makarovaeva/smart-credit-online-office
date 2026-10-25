@@ -77,6 +77,23 @@ STOP_FACTORS: dict[StopFactorCode, tuple[StopFactorCategory, str]] = {
     StopFactorCode.NO_TAX_ACTIVITY: (StopFactorCategory.FICTITIOUS, "Нет налоговой активности"),
 }
 
+# Что сказать клиенту при автоотказе: можно ли что-то изменить
+STOP_FACTOR_ADVICE: dict[StopFactorCode, str] = {
+    StopFactorCode.BANKRUPTCY: "Подать заявку можно после завершения процедуры банкротства",
+    StopFactorCode.OBSERVATION_PROCEDURE: "Подать заявку можно после завершения процедуры",
+    StopFactorCode.ACCOUNTS_BLOCKED_115FZ: "Сначала снимите ограничения по счетам по 115-ФЗ",
+    StopFactorCode.SANCTIONED_OWNER: "Банк не кредитует компании с собственниками из санкционных"
+    " списков",
+    StopFactorCode.PROHIBITED_ACTIVITY: "Банк не кредитует этот вид деятельности",
+    StopFactorCode.NEGATIVE_CASH_FLOW: "Повторите заявку, когда денежный поток станет"
+    " положительным несколько месяцев подряд",
+    StopFactorCode.LOW_DSCR: "Снизьте действующую долговую нагрузку или запросите меньшую сумму",
+    StopFactorCode.MASS_ADDRESS: "Обновите адрес регистрации в ЕГРЮЛ",
+    StopFactorCode.MASS_DIRECTOR: "Обновите сведения о руководителе в ЕГРЮЛ",
+    StopFactorCode.NO_EMPLOYEES: "Подтвердите наличие сотрудников в отчётности",
+    StopFactorCode.NO_TAX_ACTIVITY: "Повторите заявку после сдачи налоговой отчётности",
+}
+
 ESCALATION_DESCRIPTIONS: dict[EscalationReasonCode, str] = {
     Escalation.LOW_CONFIDENCE: "Уверенность модели ниже 80%",
     Escalation.YOUNG_BUSINESS: "Бизнес существует менее года",

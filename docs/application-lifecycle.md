@@ -71,7 +71,7 @@ stateDiagram-v2
 | — | `completed` | Терминальный: средства выданы | — |
 | — | `closed` | Терминальный: «Закрыто без выдачи» | — |
 
-Причина закрытия — `applications.close_reason`, четыре пути к финалу без выдачи:
+Причина закрытия — `applications.close_reason`, пять путей к финалу без выдачи (четыре с доски и отмена клиентом):
 
 | `close_reason` | Откуда |
 |---|---|
@@ -79,6 +79,7 @@ stateDiagram-v2
 | `auto_declined` | Красная зона: стоп-фактор (`decision_routing`) |
 | `underwriter_declined` | Отказ андеррайтера (`underwriter_review`) |
 | `offer_rejected` | Клиент не принял оффер или контр-предложение (`offer_rejected`) |
+| `client_cancelled` | Клиент отменил заявку до решения банка: `draft`, `pre_approved`, `submitted`, `need_additional_data`, `analyst_escalation`, `underwriter_review` (`POST /applications/{id}/cancel`); открытые дозапросы и запросы экспертизы закрываются |
 
 ## Статусы глазами клиента
 
@@ -162,7 +163,7 @@ stateDiagram-v2
 
 | Сущность | Успех | Без выдачи |
 |---|---|---|
-| Заявка (`applications.status`) | `completed` — средства выданы | `closed` с `close_reason`: `pre_approval_declined`, `auto_declined`, `underwriter_declined`, `offer_rejected` |
+| Заявка (`applications.status`) | `completed` — средства выданы | `closed` с `close_reason`: `pre_approval_declined`, `auto_declined`, `underwriter_declined`, `offer_rejected`, `client_cancelled` |
 | Клиенту (`client_status`) | `disbursed` («Средства зачислены») | `closed` («Закрыто») |
 | Кредит (`loan_contracts.status`) | `awaiting_signature` → `signed` → `active`; далее `overdue`, `closed` (обслуживание кредита не моделируется) | договор не создаётся |
 
@@ -249,7 +250,33 @@ stateDiagram-v2
 
 Ответ — `POST /applications/{id}/info-requests/{rid}/answer`. Если в дозапросе перечислены типы документов, нужен хотя бы один файл каждого типа, загруженный после дозапроса (или с его `info_request_id`); иначе нужен текст ответа. Заявка возвращается, когда закрыты все открытые дозапросы. Сотрудники скачивают файлы своих заявок через `GET /backoffice/applications/{id}/documents/{doc}/content`.
 
+## Запросы между сотрудниками, уведомления, правило одной заявки
+
+**Одна заявка в работе на компанию.** Пока у компании есть заявка не в `completed` / `closed`, новая не создаётся (`409` с номером текущей). Чтобы подать новую, текущую можно отменить (`client_cancelled`) или отказаться от оффера.
+
+**Запрос экспертизы андеррайтера у аналитика** (`internal_requests`). Создаётся решением `more_information_required` с `more_info_target=credit_analyst`, заявка уходит в `analyst_escalation` к прежнему аналитику.
+
+| Действие | Кто | Результат |
+|---|---|---|
+| `accept` | аналитик-исполнитель | `open → accepted` («экспертиза в работе») |
+| `analyst-conclusion` | аналитик | запрос `completed`, заключение — в `response_comment`, заявка → `underwriter_review` |
+| `return` с комментарием | аналитик-исполнитель | запрос `returned`, `analyst_escalation → underwriter_review`, андеррайтеру — уведомление |
+| `cancel` | автор-андеррайтер | запрос `cancelled`, `analyst_escalation → underwriter_review` |
+| `remind` | автор-андеррайтер | уведомление аналитику |
+
+В очереди бэкофиса `expertise_request` разделяет вкладки «Новые эскалации» (от ИИ) и «Запросы от андеррайтера».
+
+**Дозапросы клиенту от сотрудников.** Инициатор (аналитик или андеррайтер) может напомнить клиенту — сообщение ИИ-агента в чате и уведомление — и отозвать дозапрос. Если открытых дозапросов не осталось, заявка возвращается к нему (`need_additional_data → analyst_escalation | underwriter_review`).
+
+**Уведомления в кабинете** (`notifications`, без email и SMS):
+- клиенту (всем представителям компании) — дозапрос документов, оффер, отказ с причиной, договор на подпись, зачисление, отмена; в паре с сообщением ИИ-агента в чате;
+- сотруднику — назначение заявки (автоматическое и передача коллегой), возврат запроса экспертизы, напоминания.
+
+**Объяснение отказа.** `ApplicationRead.decline_reasons`: при автоотказе — стоп-факторы с советом, что можно изменить (`credit_policy.STOP_FACTOR_ADVICE`), при отказе андеррайтера — его причины.
+
 ## Допущения и неопределённости
+
+- Отмена заявки клиентом до решения и правило «одна заявка в работе на компанию» на доске не заданы, добавлены по договорённости с командой.
 
 - Отказ клиента на `pre_approved` → `closed`: на статусной модели не определён, но на пользовательском пути ведёт в «Закрыто без выдачи».
 - Возвраты из `need_additional_data` взяты с пользовательского пути: после дозапроса ИИ — повторная проверка комплекта (`ai_verification`), после дозапроса андеррайтера — сразу `underwriter_review`. Статусная модель предлагала возврат в финансовый анализ.

@@ -197,7 +197,9 @@ paths:
       tags:
       - products
       summary: Match Products
-      description: 'Подбор продуктов под потребность: подходящие первыми, с пояснениями и примерным платежом.'
+      description: |-
+        Подбор продуктов под потребность: подходящие первыми, с пояснениями и примерным платежом
+        (аннуитет по базовой ставке на условиях, ближайших к запрошенным в рамках продукта).
       operationId: match_products_api_v1_products_match_post
       requestBody:
         content:
@@ -412,7 +414,9 @@ paths:
       tags:
       - applications
       summary: Create Application
-      description: Создать черновик заявки.
+      description: |-
+        Создать черновик заявки. У компании одна заявка в работе: пока есть незавершённая
+        (не completed и не closed) - 409.
       operationId: create_application_api_v1_applications_post
       security:
       - HTTPBearer: []
@@ -443,6 +447,12 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Действие недопустимо в текущем статусе заявки или версия устарела
           content:
             application/json:
               schema:
@@ -809,6 +819,63 @@ paths:
         Клиент не продолжает после предварительного расчёта: pre_approved -> closed
         (close_reason = pre_approval_declined).
       operationId: decline_pre_approval_api_v1_applications__application_id__pre_approval_decline_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: application_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Application Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplicationRead'
+        '401':
+          description: Нет или невалидный токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Действие недопустимо в текущем статусе заявки или версия устарела
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/applications/{application_id}/cancel:
+    post:
+      tags:
+      - applications
+      summary: Cancel Application
+      description: |-
+        Отменить заявку до решения банка (draft ... underwriter_review): -> closed,
+        close_reason = client_cancelled; открытые дозапросы закрываются. У компании может быть
+        только одна заявка в работе - отмена позволяет подать новую.
+      operationId: cancel_application_api_v1_applications__application_id__cancel_post
       security:
       - HTTPBearer: []
       parameters:
@@ -1794,6 +1861,10 @@ paths:
       tags:
       - notifications
       summary: List Notifications
+      description: |-
+        Уведомления в кабинете, новые первыми. Клиенту - о событиях заявки (дозапрос, оффер,
+        отказ, договор, зачисление), сотруднику - о назначении заявки, запросах и напоминаниях.
+        unread - число непрочитанных для счётчика.
       operationId: list_notifications_api_v1_notifications_get
       security:
       - HTTPBearer: []
@@ -1828,7 +1899,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Page_NotificationRead_'
+                $ref: '#/components/schemas/NotificationPage'
         '401':
           description: Нет или невалидный токен
           content:
@@ -1847,6 +1918,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/notifications/read-all:
+    post:
+      tags:
+      - notifications
+      summary: Mark All Read
+      operationId: mark_all_read_api_v1_notifications_read_all_post
+      responses:
+        '204':
+          description: Successful Response
+        '401':
+          description: Нет или невалидный токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - HTTPBearer: []
   /api/v1/notifications/{notification_id}/read:
     post:
       tags:
@@ -2271,6 +2365,384 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/backoffice/applications/{application_id}/internal-requests/{request_id}/accept:
+    post:
+      tags:
+      - backoffice
+      summary: Accept Expertise Request
+      description: |-
+        Аналитик принимает запрос экспертизы в работу (open -> accepted). Закрывает его
+        заключение (analyst-conclusion) или возврат андеррайтеру.
+      operationId: accept_expertise_request_api_v1_backoffice_applications__application_id__internal_requests__request_id__accept_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: application_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Application Id
+      - name: request_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Request Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalRequestRead'
+        '401':
+          description: Нет или невалидный токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Действие недопустимо в текущем статусе заявки или версия устарела
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/backoffice/applications/{application_id}/internal-requests/{request_id}/return:
+    post:
+      tags:
+      - backoffice
+      summary: Return Expertise Request
+      description: |-
+        Вернуть запрос андеррайтеру с комментарием, без заключения:
+        analyst_escalation -> underwriter_review, андеррайтер получает уведомление.
+      operationId: return_expertise_request_api_v1_backoffice_applications__application_id__internal_requests__request_id__return_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: application_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Application Id
+      - name: request_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Request Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReturnRequestBody'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalRequestRead'
+        '401':
+          description: Нет или невалидный токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Действие недопустимо в текущем статусе заявки или версия устарела
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/backoffice/applications/{application_id}/internal-requests/{request_id}/cancel:
+    post:
+      tags:
+      - backoffice
+      summary: Cancel Expertise Request
+      description: 'Андеррайтер отзывает свой запрос экспертизы: analyst_escalation -> underwriter_review.'
+      operationId: cancel_expertise_request_api_v1_backoffice_applications__application_id__internal_requests__request_id__cancel_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: application_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Application Id
+      - name: request_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Request Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalRequestRead'
+        '401':
+          description: Нет или невалидный токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Действие недопустимо в текущем статусе заявки или версия устарела
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/backoffice/applications/{application_id}/internal-requests/{request_id}/remind:
+    post:
+      tags:
+      - backoffice
+      summary: Remind Analyst
+      description: Напомнить аналитику о запросе экспертизы (уведомление в кабинете).
+      operationId: remind_analyst_api_v1_backoffice_applications__application_id__internal_requests__request_id__remind_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: application_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Application Id
+      - name: request_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Request Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InternalRequestRead'
+        '401':
+          description: Нет или невалидный токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Действие недопустимо в текущем статусе заявки или версия устарела
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/backoffice/applications/{application_id}/info-requests/{request_id}/cancel:
+    post:
+      tags:
+      - backoffice
+      summary: Cancel Info Request
+      description: |-
+        Отозвать свой дозапрос клиенту (аналитик или андеррайтер - инициатор). Если открытых
+        дозапросов не осталось, заявка возвращается к инициатору.
+      operationId: cancel_info_request_api_v1_backoffice_applications__application_id__info_requests__request_id__cancel_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: application_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Application Id
+      - name: request_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Request Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InfoRequestRead'
+        '401':
+          description: Нет или невалидный токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Действие недопустимо в текущем статусе заявки или версия устарела
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/backoffice/applications/{application_id}/info-requests/{request_id}/remind:
+    post:
+      tags:
+      - backoffice
+      summary: Remind Client
+      description: 'Напомнить клиенту о дозапросе через ИИ-агента: сообщение в чате и уведомление.'
+      operationId: remind_client_api_v1_backoffice_applications__application_id__info_requests__request_id__remind_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: application_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Application Id
+      - name: request_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Request Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InfoRequestRead'
+        '401':
+          description: Нет или невалидный токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Объект не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Действие недопустимо в текущем статусе заявки или версия устарела
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/backoffice/applications/{application_id}/documents/{document_id}/content:
     get:
       tags:
@@ -2514,6 +2986,7 @@ components:
       - accept_offer
       - reject_offer
       - sign
+      - cancel
       title: ApplicationAction
       description: Что клиент может сделать с заявкой сейчас - фронт строит по этому кнопки.
     ApplicationCreate:
@@ -2769,6 +3242,13 @@ components:
             $ref: '#/components/schemas/ApplicationAction'
           type: array
           title: Available Actions
+        decline_reasons:
+          items:
+            $ref: '#/components/schemas/DeclineReason'
+          type: array
+          title: Decline Reasons
+          description: Почему отказано (автоотказ - стоп-факторы, отказ андеррайтера - его причины)
+          default: []
       type: object
       required:
       - id
@@ -3039,6 +3519,11 @@ components:
             $ref: '#/components/schemas/InfoRequestRead'
           type: array
           title: Info Requests
+        internal_requests:
+          items:
+            $ref: '#/components/schemas/InternalRequestRead'
+          type: array
+          title: Internal Requests
         documents:
           items:
             $ref: '#/components/schemas/DocumentRead'
@@ -3063,6 +3548,7 @@ components:
       - decisions
       - contract
       - info_requests
+      - internal_requests
       - documents
       - history
       title: BackofficeApplicationDetail
@@ -3120,6 +3606,12 @@ components:
           anyOf:
           - $ref: '#/components/schemas/RiskZone'
           - type: 'null'
+        expertise_request:
+          anyOf:
+          - $ref: '#/components/schemas/InternalRequestStatus'
+          - type: 'null'
+          description: 'Активный запрос экспертизы андеррайтера (open / accepted): на вкладке «Запросы
+            от андеррайтера», без него эскалация - «Новые эскалации» от ИИ'
       type: object
       required:
       - id
@@ -3333,8 +3825,9 @@ components:
       - auto_declined
       - underwriter_declined
       - offer_rejected
+      - client_cancelled
       title: CloseReason
-      description: Четыре пути к финалу «Закрыто без выдачи».
+      description: 'Пути к финалу «Закрыто без выдачи»: четыре с доски и отмена клиентом.'
     CollateralType:
       type: string
       enum:
@@ -3958,6 +4451,24 @@ components:
       - more_information_required
       title: DecisionType
       description: Четыре решения андеррайтера.
+    DeclineReason:
+      properties:
+        code:
+          type: string
+          title: Code
+        message:
+          type: string
+          title: Message
+        advice:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Advice
+      type: object
+      required:
+      - code
+      - message
+      title: DeclineReason
     DocumentRead:
       properties:
         id:
@@ -4201,6 +4712,75 @@ components:
       - answered
       - cancelled
       title: InfoRequestStatus
+    InternalRequestRead:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        application_id:
+          type: string
+          format: uuid
+          title: Application Id
+        from_user_id:
+          type: string
+          format: uuid
+          title: From User Id
+        accepted_by_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Accepted By Id
+        status:
+          $ref: '#/components/schemas/InternalRequestStatus'
+        message:
+          type: string
+          title: Message
+        response_comment:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Response Comment
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        accepted_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Accepted At
+        closed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Closed At
+      type: object
+      required:
+      - id
+      - application_id
+      - from_user_id
+      - accepted_by_id
+      - status
+      - message
+      - response_comment
+      - created_at
+      - accepted_at
+      - closed_at
+      title: InternalRequestRead
+    InternalRequestStatus:
+      type: string
+      enum:
+      - open
+      - accepted
+      - completed
+      - returned
+      - cancelled
+      title: InternalRequestStatus
+      description: Запрос экспертизы андеррайтера у аналитика.
     LegalForm:
       type: string
       enum:
@@ -4422,6 +5002,33 @@ components:
       - credit_analyst
       title: MoreInfoTarget
       description: Кому андеррайтер адресует more_information_required.
+    NotificationPage:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/NotificationRead'
+          type: array
+          title: Items
+        total:
+          type: integer
+          title: Total
+        limit:
+          type: integer
+          title: Limit
+        offset:
+          type: integer
+          title: Offset
+        unread:
+          type: integer
+          title: Unread
+      type: object
+      required:
+      - items
+      - total
+      - limit
+      - offset
+      - unread
+      title: NotificationPage
     NotificationRead:
       properties:
         id:
@@ -4599,29 +5206,6 @@ components:
       - limit
       - offset
       title: Page[BackofficeApplicationItem]
-    Page_NotificationRead_:
-      properties:
-        items:
-          items:
-            $ref: '#/components/schemas/NotificationRead'
-          type: array
-          title: Items
-        total:
-          type: integer
-          title: Total
-        limit:
-          type: integer
-          title: Limit
-        offset:
-          type: integer
-          title: Offset
-      type: object
-      required:
-      - items
-      - total
-      - limit
-      - offset
-      title: Page[NotificationRead]
     PaymentScheduleItemRead:
       properties:
         installment_no:
@@ -4859,6 +5443,17 @@ components:
       - annuity
       - differentiated
       title: RepaymentType
+    ReturnRequestBody:
+      properties:
+        comment:
+          type: string
+          maxLength: 2000
+          minLength: 1
+          title: Comment
+      type: object
+      required:
+      - comment
+      title: ReturnRequestBody
     RiskGrade:
       type: string
       enum:

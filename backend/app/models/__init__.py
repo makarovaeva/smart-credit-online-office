@@ -10,6 +10,7 @@ from app.models.assessment import CreditDecision, CreditMemo, ExternalCheck, Sco
 from app.models.chat import ChatMessage
 from app.models.company import Company, CompanyMember, CompanyOwner
 from app.models.document import Document, InfoRequest
+from app.models.internal_request import InternalRequest
 from app.models.loan import LoanContract, PaymentScheduleItem
 from app.models.notification import Notification
 from app.models.product import CreditProduct
@@ -29,6 +30,7 @@ __all__ = [
     "Document",
     "ExternalCheck",
     "InfoRequest",
+    "InternalRequest",
     "LoanContract",
     "Notification",
     "PaymentScheduleItem",

@@ -11,7 +11,7 @@ Postman-коллекция с примерами запросов и сквоз�
 - очереди, карточка и назначение в бэкофисе;
 - `/companies/lookup` на моке ЕГРЮЛ (демо-ИНН — в [`../external-sources.md`](../external-sources.md)).
 
-Остальные эндпоинты пока заглушки (`501`), но контракт зафиксирован: `/products/match`, `/notifications`.
+Все объявленные эндпоинты реализованы.
 
 Этапы конвейера ИИ запускаются сразу после команд клиента. `/consents` возвращает заявку уже в `pre_approved`. `/submit` возвращает её в `underwriter_review`, `analyst_escalation`, `need_additional_data` или `closed` (автоотказ). Подробно — [`../application-lifecycle.md`](../application-lifecycle.md#кредитный-конвейер).
 
@@ -58,7 +58,7 @@ cd backend && uv run python -m scripts.export_openapi
 | POST | `/auth/login/phone` | Вход клиента по номеру телефона |
 | GET | `/me` | Пользователь и его компании |
 | GET | `/products` | Каталог продуктов |
-| POST | `/products/match` | Подбор продукта под цель, сумму и срок |
+| POST | `/products/match` | Подбор продукта под цель, сумму и срок: подходящие первыми, пояснения (`notes`), ставка и примерный платёж |
 | GET | `/companies/lookup?inn=` | Реквизиты, руководитель и учредители из ЕГРЮЛ/ЕГРИП (мок) для предзаполнения |
 | POST/GET | `/companies` | Привязать компанию по ИНН (реквизиты — из реестра; уже обслуживаемая компания — `409`) / мои компании с ролью |
 | GET | `/companies/{id}` | Профиль компании: организация и деятельность (ОКВЭД, система налогообложения), руководитель, бенефициары с долями, право подписи (`signatories`), телефон, e-mail, расчётный счёт. Чужая — `404` |
@@ -68,6 +68,7 @@ cd backend && uv run python -m scripts.export_openapi
 | GET | `/applications/{id}/pre-approval` | Предварительный лимит |
 | POST | `/applications/{id}/pre-approval/decline` | Не продолжать: `pre_approved → closed` |
 | POST | `/applications/{id}/submit` | Подать заявку: `pre_approved → submitted` |
+| POST | `/applications/{id}/cancel` | Отменить до решения банка: `→ closed`, `close_reason=client_cancelled`. У компании одна заявка в работе: `POST /applications` при незавершённой — `409` |
 | GET | `/applications/{id}/history` | Таймлайн статусов |
 | POST/GET | `/applications/{id}/documents` | Загрузить (multipart: `file`, `type`, необязательный `info_request_id`) / список. Загрузка — в `draft`, `pre_approved`, `need_additional_data` |
 | GET | `/applications/{id}/documents/{doc}/content` | Скачать файл |
@@ -80,7 +81,8 @@ cd backend && uv run python -m scripts.export_openapi
 | GET | `/applications/{id}/contract` | Кредитный договор и график платежей (после принятия оффера) |
 | GET/POST | `/chat/messages` | Диалог с ИИ-агентом (`company_id`, необязательный `application_id`). POST возвращает пару: сообщение клиента и ответ агента. Если из текста разобраны параметры кредита — `confirmation_card` с суммой, сроком, целью, залогом и продуктом. Ещё агент отвечает о статусе, документах, оффере, отказе и продуктах. `client_message_id` защищает от дублей, `generated_by`: `rules` или `llm:<модель>`. Агент сам пишет о дозапросе, оффере, отказе, договоре и зачислении |
 | GET | `/loans`, `/loans/{id}` | Раздел «Кредиты»: договоры с остатком долга, ближайшим платежом и графиком |
-| GET | `/notifications`, POST `/notifications/{id}/read` | Уведомления в кабинете |
+| GET | `/notifications` | Уведомления в кабинете, новые первыми; `unread` — счётчик непрочитанных, `unread_only` — фильтр |
+| POST | `/notifications/{id}/read`, `/notifications/read-all` | Отметить прочитанным |
 
 ### Банк
 
@@ -93,6 +95,9 @@ cd backend && uv run python -m scripts.export_openapi
 | POST | `/backoffice/applications/{id}/analyst-conclusion` | аналитик | Заключение: `analyst_escalation → analyst_completed → underwriter_review` |
 | POST | `/backoffice/applications/{id}/info-requests` | аналитик (исполнитель) | Запрос документов у клиента через ИИ: `analyst_escalation → need_additional_data`, после ответа — обратно к аналитику |
 | GET | `/backoffice/applications/{id}/documents/{doc}/content` | аналитик, андеррайтер, админ | Скачать файл документа своей заявки |
+| POST | `/backoffice/applications/{id}/internal-requests/{rid}/accept`, `/return` | аналитик (исполнитель) | Запрос экспертизы андеррайтера: принять в работу / вернуть с комментарием (`→ underwriter_review`) |
+| POST | `/backoffice/applications/{id}/internal-requests/{rid}/cancel`, `/remind` | андеррайтер (автор) | Отозвать запрос экспертизы (`→ underwriter_review`) / напомнить аналитику |
+| POST | `/backoffice/applications/{id}/info-requests/{rid}/cancel`, `/remind` | инициатор дозапроса | Отозвать дозапрос клиенту (возврат заявки к инициатору) / напомнить клиенту через ИИ-агента |
 | POST | `/backoffice/applications/{id}/contract` | аналитик (исполнитель) | Подготовка договора: `contract_generation → e_sign`. Нужна при `CONTRACT_PREPARATION=analyst`, в режиме `auto` договор готовится сам |
 | POST | `/backoffice/applications/{id}/decision` | андеррайтер | Одно из 4 решений. `more_information_required` с `more_info_target`: `client` — дозапрос документов, `credit_analyst` — запрос экспертизы. `conditional_approval` с `alternative_offer` берёт условия варианта из AI Credit Memo |
 

@@ -115,7 +115,7 @@ async def test_create_draft(draft: dict) -> None:
     assert draft["number"].startswith("CR-")
     assert draft["status"] == "draft"
     assert draft["client_status"] == "draft"
-    assert draft["available_actions"] == ["edit", "give_consents", "upload_documents"]
+    assert draft["available_actions"] == ["edit", "give_consents", "upload_documents", "cancel"]
     assert draft["requested_amount"] == "3000000.00"
     assert draft["version"] == 1
 

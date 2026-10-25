@@ -43,7 +43,18 @@ def test_analyst_escalation_returns_to_underwriter() -> None:
 def test_only_underwriter_decides() -> None:
     for actor in (A.SYSTEM, A.CREDIT_ANALYST, A.CLIENT):
         assert not can_transition(S.UNDERWRITER_REVIEW, S.OFFER_GENERATED, actor)
+    for actor in (A.SYSTEM, A.CREDIT_ANALYST):
         assert not can_transition(S.UNDERWRITER_REVIEW, S.CLOSED, actor)
+
+
+def test_client_cancels_before_decision_only() -> None:
+    """Клиент закрывает заявку только отменой до решения (close_reason=client_cancelled);
+    после оффера - отказом от оффера."""
+    for status in (S.DRAFT, S.SUBMITTED, S.NEED_ADDITIONAL_DATA, S.ANALYST_ESCALATION):
+        assert can_transition(status, S.CLOSED, A.CLIENT)
+    assert can_transition(S.UNDERWRITER_REVIEW, S.CLOSED, A.CLIENT)
+    for status in (S.OFFER_GENERATED, S.E_SIGN, S.DISBURSEMENT):
+        assert not can_transition(status, S.CLOSED, A.CLIENT)
 
 
 def test_auto_decline_only_on_routing() -> None:

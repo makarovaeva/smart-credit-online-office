@@ -22,7 +22,9 @@ function tabRows(name: string, rows: ObjectData[]) {
     if (name.includes("Closed")) return rows.filter(a => a.status === "closed");
     if (name.includes("Done")) return rows.filter(a => a.status === "completed");
   }
-  if (name === "A_AnalystNew.dc.html" || name === "A_AnalystFromUw.dc.html") return rows.filter(a => a.status === "analyst_escalation");
+  // Новые эскалации - от ИИ, запросы от андеррайтера - с активным запросом экспертизы
+  if (name === "A_AnalystNew.dc.html") return rows.filter(a => a.status === "analyst_escalation" && !a.expertise_request);
+  if (name === "A_AnalystFromUw.dc.html") return rows.filter(a => a.status === "analyst_escalation" && !!a.expertise_request);
   if (name === "A_AnalystInWork.dc.html") return rows.filter(a => a.status === "need_additional_data");
   if (name === "U_Pending.dc.html") return rows.filter(a => a.status === "underwriter_review");
   if (name === "U_Mine.dc.html") return rows;
@@ -139,12 +141,16 @@ export function bindBank(html: string, name: string, bank: BankState & { draft: 
     value = value.replace(/№\[номер\]/g, `№${str(app.number)}`);
     value = value.replace(/3 000 000 ₽/g, money(loanTerms ? loan.principal_amount : app.requested_amount ?? bank.draft.amount));
     value = value.replace(/24 месяца/g, `${str(loanTerms ? loan.term_months : app.requested_term_months ?? bank.draft.term)} мес.`);
+    const expertise = list(detail.internal_requests).filter(r => ["open", "accepted"].includes(str(r.status))).at(-1);
+    const info = list(detail.info_requests).filter(r => r.status === "open").at(-1);
+    if (expertise) value = value.replace(/\[(Текст вопроса для экспертизы|текст вопроса)\]/g, str(expertise.message));
+    if (info) value = value.replace("[перечень документов]", str(info.message));
     value = value.replace(/\[[^\]]+\]/g, "—");
     text.textContent = value;
   }
 
   if (!employee) {
-    doc.querySelectorAll("p").forEach(p => { if (/^Причин[аы]:/.test(p.textContent?.trim() ?? "")) p.textContent = list(offer.reasons).map(r => str(r.message)).join("; ") || str(app.status_description); });
+    doc.querySelectorAll("p").forEach(p => { if (/^Причин[аы]:/.test(p.textContent?.trim() ?? "")) p.textContent = list(app.decline_reasons).map(r => r.advice ? `${str(r.message)}. ${str(r.advice)}` : str(r.message)).join("; ") || list(offer.reasons).map(r => str(r.message)).join("; ") || str(app.status_description); });
     const chips = doc.querySelectorAll("main > section > div > .chip, main > section > .chip");
     chips.forEach(chip => { chip.textContent = str(app.status_description ?? statusLabel(app.status)); });
     if (name.includes("Chat") && !name.includes("ChatEdit")) {

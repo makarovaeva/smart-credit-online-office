@@ -10,7 +10,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Application, CreditDecision, CreditMemo, User
-from app.models.enums import ApplicationStatus, UserRole
+from app.models.enums import ApplicationStatus, NotificationType, UserRole
+from app.services import notifications
 
 STAGE_ROLES = {
     ApplicationStatus.ANALYST_ESCALATION: UserRole.CREDIT_ANALYST,
@@ -53,16 +54,36 @@ async def _least_loaded(session: AsyncSession, role: UserRole) -> uuid.UUID | No
     )
 
 
-async def auto_assign(session: AsyncSession, application: Application) -> None:
-    """Назначает исполнителя под текущий статус; вне этапов сотрудников - снимает."""
-    role = STAGE_ROLES.get(application.status)
-    if role is None:
-        application.assignee_id = None
-        return
+async def _pick(session: AsyncSession, application: Application, role: UserRole):
     previous = await _previous_performer(session, application.id, role)
     if previous is not None:
         user = await session.get(User, previous)
         if user is not None and user.is_active and user.role == role:
-            application.assignee_id = previous
-            return
-    application.assignee_id = await _least_loaded(session, role)
+            return previous
+    return await _least_loaded(session, role)
+
+
+STAGE_TITLES = {
+    ApplicationStatus.ANALYST_ESCALATION: "Заявка на анализ",
+    ApplicationStatus.UNDERWRITER_REVIEW: "Заявка на рассмотрение",
+    ApplicationStatus.CONTRACT_GENERATION: "Подготовка договора",
+}
+
+
+async def auto_assign(session: AsyncSession, application: Application) -> None:
+    """Назначает исполнителя под текущий статус и уведомляет его; вне этапов сотрудников -
+    снимает."""
+    role = STAGE_ROLES.get(application.status)
+    if role is None:
+        application.assignee_id = None
+        return
+    application.assignee_id = await _pick(session, application, role)
+    if application.assignee_id is not None:
+        notifications.add(
+            session,
+            [application.assignee_id],
+            application,
+            NotificationType.APPLICATION_ASSIGNED,
+            f"{STAGE_TITLES[application.status]}: {application.number}",
+            "Заявка назначена на вас и ждёт в очереди.",
+        )

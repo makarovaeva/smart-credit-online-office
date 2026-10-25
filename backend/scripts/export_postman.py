@@ -90,6 +90,27 @@ def js_expect(expr: str, value: str) -> str:
     return f"pm.test('{expr} = {value}', () => pm.expect({expr}).to.eql({json.dumps(value)}));"
 
 
+def js_close_active(token: str) -> list[str]:
+    """Закрыть незавершённые заявки клиента с прошлых прогонов: у компании одна заявка в
+    работе. До решения - отмена, на этапе оффера - отказ от оффера."""
+    return f"""
+const base = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl');
+const auth = {{ Authorization: `Bearer ${{pm.collectionVariables.get('{token}')}}` }};
+pm.sendRequest({{ url: `${{base}}/applications?limit=100`, header: auth }}, (err, res) => {{
+  if (err || res.code !== 200) return;
+  for (const app of res.json().items) {{
+    if (['completed', 'closed'].includes(app.status)) continue;
+    const command = app.status === 'offer_generated' ? 'offer/reject' : 'cancel';
+    pm.sendRequest({{
+      url: `${{base}}/applications/${{app.id}}/${{command}}`, method: 'POST',
+      header: {{ ...auth, 'Content-Type': 'application/json' }},
+      body: {{ mode: 'raw', raw: '{{}}' }},
+    }}, () => {{}});
+  }}
+}});
+""".strip().splitlines()
+
+
 def client_start(prefix: str, phone: str, amount: str, term: int = 36) -> list[dict[str, Any]]:
     """Вход клиента, создание черновика, согласия и подача: общее начало сценариев."""
     token, app_id = f"{prefix}Token", f"{prefix}AppId"
@@ -106,7 +127,10 @@ def client_start(prefix: str, phone: str, amount: str, term: int = 36) -> list[d
             "GET",
             "/me",
             token=token,
-            tests=[js_set(f"{prefix}CompanyId", "pm.response.json().companies[0].company_id")],
+            tests=[
+                js_set(f"{prefix}CompanyId", "pm.response.json().companies[0].company_id"),
+                *js_close_active(token),
+            ],
         ),
         request(
             "Клиент: создать черновик заявки",
@@ -202,7 +226,10 @@ def build_collection() -> dict[str, Any]:
             "GET",
             "/me",
             token="clientToken",
-            tests=[js_set("companyId", "pm.response.json().companies[0].company_id")],
+            tests=[
+                js_set("companyId", "pm.response.json().companies[0].company_id"),
+                *js_close_active("clientToken"),
+            ],
         ),
         request(
             "Клиент: профиль компании",
@@ -215,6 +242,17 @@ def build_collection() -> dict[str, Any]:
                 "pm.test('есть руководитель и счёт', () => { const c = pm.response.json(); "
                 "pm.expect(c.head.full_name).to.be.a('string'); "
                 "pm.expect(c.settlement_account.account_number).to.match(/^40702810/); });",
+            ],
+        ),
+        request(
+            "Подбор продукта",
+            "POST",
+            "/products/match",
+            body={"purpose": "working_capital", "amount": "3000000", "term_months": 24},
+            description="Подходящие продукты первыми, с пояснениями и примерным платежом.",
+            tests=[
+                "pm.test('первый продукт подходит', () => pm.expect(pm.response.json()[0].fits)"
+                ".to.be.true);"
             ],
         ),
         request(
@@ -391,6 +429,17 @@ def build_collection() -> dict[str, Any]:
             tests=[
                 "pm.test('есть сообщение о зачислении', () => pm.expect(pm.response.json()"
                 ".map(m => m.content).join(' ')).to.include('Средства зачислены'));"
+            ],
+        ),
+        request(
+            "Клиент: уведомления",
+            "GET",
+            "/notifications",
+            token="clientToken",
+            description="Уведомления в кабинете о событиях заявки, счётчик непрочитанных.",
+            tests=[
+                "pm.test('есть уведомление о зачислении', () => pm.expect(pm.response.json()"
+                ".items.map(n => n.type)).to.include('funds_disbursed'));"
             ],
         ),
         request(
@@ -622,6 +671,20 @@ def build_collection() -> dict[str, Any]:
             "/applications/{{applicationId}}",
             token="counterToken",
             status=404,
+        ),
+        request(
+            "409: вторая заявка компании в работе",
+            "POST",
+            "/applications",
+            token="counterToken",
+            status=409,
+            body={
+                "company_id": "{{counterCompanyId}}",
+                "product_id": "{{productId}}",
+                "requested_amount": "1000000.00",
+                "requested_term_months": 24,
+                "purpose": "working_capital",
+            },
         ),
         request(
             "409: подпись до принятия оффера",

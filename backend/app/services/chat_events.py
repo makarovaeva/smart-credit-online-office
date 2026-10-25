@@ -17,7 +17,9 @@ from app.models.enums import (
     CloseReason,
     DecisionType,
     InfoRequestStatus,
+    NotificationType,
 )
+from app.services import notifications
 
 S = ApplicationStatus
 
@@ -90,6 +92,12 @@ async def _closed_message(
             text += f". Причина: {reasons}." if reasons else "."
         case CloseReason.OFFER_REJECTED:
             text = "Вы отказались от предложения банка, заявка закрыта."
+        case CloseReason.CLIENT_CANCELLED:
+            return _message(
+                application,
+                ChatMessageType.STATUS_NOTIFICATION,
+                "Заявка отменена по вашему запросу.",
+            )
         case _:
             return None
     return _message(application, ChatMessageType.REJECTION_NOTICE, text)
@@ -109,10 +117,20 @@ def _message(
     )
 
 
+# Уведомление в кабинете к сообщению агента: тип и заголовок по этапу
+_NOTIFICATIONS = {
+    S.NEED_ADDITIONAL_DATA: (NotificationType.DOCUMENT_REQUEST, "Банку нужны документы"),
+    S.OFFER_GENERATED: (NotificationType.OFFER_READY, "Предложение банка готово"),
+    S.E_SIGN: (NotificationType.CONTRACT_TO_SIGN, "Договор готов к подписанию"),
+    S.COMPLETED: (NotificationType.FUNDS_DISBURSED, "Средства зачислены"),
+}
+
+
 async def notify(
     session: AsyncSession, application: Application, comment: str | None = None
 ) -> None:
-    """Сообщение о новом статусе заявки (статус уже сменён)."""
+    """Сообщение агента в чат и уведомление представителям компании о новом статусе заявки
+    (статус уже сменён)."""
     message: ChatMessage | None
     match application.status:
         case S.NEED_ADDITIONAL_DATA:
@@ -135,5 +153,18 @@ async def notify(
             )
         case _:
             message = None
-    if message is not None:
-        session.add(message)
+    if message is None:
+        return
+    session.add(message)
+    if application.status == S.CLOSED:
+        declined = message.message_type == ChatMessageType.REJECTION_NOTICE
+        kind, title = (
+            (NotificationType.APPLICATION_DECLINED, "Решение по заявке")
+            if declined
+            else (NotificationType.STATUS_CHANGED, "Заявка закрыта")
+        )
+    else:
+        kind, title = _NOTIFICATIONS[application.status]
+    await notifications.to_company(
+        session, application, kind, f"{title}: {application.number}", message.content
+    )
