@@ -40,11 +40,12 @@ router = APIRouter(
 ApplicationId = uuid.UUID
 
 
-@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED, responses=CONFLICT)
 async def create_application(
     body: ApplicationCreate, user: CurrentClient, session: SessionDep
 ) -> ApplicationRead:
-    """Создать черновик заявки."""
+    """Создать черновик заявки. У компании одна заявка в работе: пока есть незавершённая
+    (не completed и не closed) - 409."""
     application = await service.create_application(session, user, body)
     return await service.to_read(session, application)
 
@@ -128,6 +129,17 @@ async def decline_pre_approval(
     """Клиент не продолжает после предварительного расчёта: pre_approved -> closed
     (close_reason = pre_approval_declined)."""
     application = await service.decline_pre_approval(session, user, application_id)
+    return await service.to_read(session, application)
+
+
+@router.post("/{application_id}/cancel", responses=CONFLICT)
+async def cancel_application(
+    application_id: ApplicationId, user: CurrentClient, session: SessionDep
+) -> ApplicationRead:
+    """Отменить заявку до решения банка (draft ... underwriter_review): -> closed,
+    close_reason = client_cancelled; открытые дозапросы закрываются. У компании может быть
+    только одна заявка в работе - отмена позволяет подать новую."""
+    application = await service.cancel_application(session, user, application_id)
     return await service.to_read(session, application)
 
 

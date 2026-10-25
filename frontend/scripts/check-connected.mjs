@@ -37,7 +37,15 @@ async function login(path, values, role) {
   await wait("document.querySelectorAll('table tbody tr').length > 0 || location.pathname === '/applications'");
   console.log(`UI login: ${role}`);
 }
+// У компании одна заявка в работе: закрываем незавершённые заявки прошлых прогонов
+async function closeActive() {
+  const rows = (await api("/api/backend/applications?limit=100")).data.items;
+  for (const app of rows.filter(a => !["completed", "closed"].includes(a.status))) {
+    await api(`/api/backend/applications/${app.id}/${app.status === "offer_generated" ? "offer/reject" : "cancel"}`, {});
+  }
+}
 async function fixture() {
+  await closeActive();
   const user = (await api("/api/session")).data;
   const products = (await api("/api/backend/products")).data;
   const product = products.find(p => !p.requires_collateral && p.purposes.includes("working_capital") && Number(p.max_amount) >= 3000000 && Number(p.min_term_months) <= 24 && Number(p.max_term_months) >= 24);
@@ -58,6 +66,7 @@ try {
     application = { id: previous.applicationId }; contract = { data: { id: previous.contractId } };
   } else {
   await login("/login", ["+7 999 000-00-01"], "client");
+  await closeActive();
   await navigate("/chat");
   await wait("document.body.innerText.includes('Подтвердить и отправить заявку')");
   await evaluate("(() => { const input = document.querySelector('input[aria-label=\"Сообщение\"]'); input.focus(); input.value = '3 млн на 2 года на пополнение оборотных средств'; input.dispatchEvent(new Event('input', { bubbles: true })); })()");

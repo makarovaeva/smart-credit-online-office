@@ -33,6 +33,8 @@ class ApplicationAction(StrEnum):
     ACCEPT_OFFER = "accept_offer"
     REJECT_OFFER = "reject_offer"
     SIGN = "sign"
+    # Отменить заявку до решения банка
+    CANCEL = "cancel"
 
 
 class ClientStatus(StrEnum):
@@ -94,6 +96,13 @@ class ApplicationUpdate(BaseModel):
     version: int = Field(description="Текущая версия заявки для оптимистичной блокировки")
 
 
+class DeclineReason(BaseModel):
+    code: str
+    message: str
+    # Что можно сделать, чтобы следующая заявка прошла
+    advice: str | None = None
+
+
 class ApplicationShort(ORMModel):
     id: uuid.UUID
     number: str
@@ -120,6 +129,10 @@ class ApplicationRead(ApplicationShort, ApplicationFinancials):
     client_status: ClientStatus
     status_description: str = Field(description="Понятное клиенту описание текущего этапа")
     available_actions: list[ApplicationAction]
+    decline_reasons: list[DeclineReason] = Field(
+        default=[],
+        description="Почему отказано (автоотказ - стоп-факторы, отказ андеррайтера - его причины)",
+    )
 
 
 class StatusHistoryItem(ORMModel):

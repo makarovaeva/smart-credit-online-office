@@ -238,7 +238,36 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
         const message = [textarea, checked.length ? `Нужно: ${checked.join("; ")}` : ""].filter(Boolean).join("\n");
         await post(`/backoffice/applications/${id}/info-requests`, { message, requested_document_types: requestedTypes });
         await load(id); transition("A_Analyst.dc.html");
-      } else if (["Принять в работу", "Вернуть с комментарием", "Напомнить клиенту через ИИ-агента", "Напомнить аналитику", "Отозвать запрос", "Отправить"].includes(text)) {
+      } else if (["Принять в работу", "Вернуть с комментарием", "Напомнить клиенту через ИИ-агента", "Напомнить аналитику", "Отозвать запрос"].includes(text)) {
+        if (!id) throw new Error("Выберите заявку");
+        const detail = latest.current.detail ?? {};
+        const expertise = list(detail.internal_requests).filter(r => ["open", "accepted"].includes(str(r.status))).at(-1);
+        const role = latest.current.user?.role === "credit_analyst" ? "credit_analyst" : "underwriter";
+        const info = list(detail.info_requests).filter(r => r.status === "open" && r.requested_by === role).at(-1);
+        const base = `/backoffice/applications/${id}`;
+        if (text === "Принять в работу") {
+          if (!expertise) throw new Error("По заявке нет запроса экспертизы");
+          await post(`${base}/internal-requests/${expertise.id}/accept`, {});
+        } else if (text === "Вернуть с комментарием") {
+          if (!expertise) throw new Error("По заявке нет запроса экспертизы");
+          const comment = window.prompt("Комментарий андеррайтеру: почему запрос возвращается без заключения");
+          if (!comment?.trim()) return true;
+          await post(`${base}/internal-requests/${expertise.id}/return`, { comment: comment.trim() });
+        } else if (text === "Напомнить клиенту через ИИ-агента") {
+          if (!info) throw new Error("Нет открытого запроса документов от вас");
+          await post(`${base}/info-requests/${info.id}/remind`, {});
+        } else if (text === "Напомнить аналитику") {
+          if (!expertise) throw new Error("Нет открытого запроса аналитику");
+          await post(`${base}/internal-requests/${expertise.id}/remind`, {});
+        } else if (expertise) {
+          await post(`${base}/internal-requests/${expertise.id}/cancel`, {});
+        } else {
+          if (!info) throw new Error("Нет открытого запроса, который можно отозвать");
+          await post(`${base}/info-requests/${info.id}/cancel`, {});
+        }
+        await load(id);
+        if (text === "Принять в работу" || text === "Вернуть с комментарием") transition("A_Analyst.dc.html");
+      } else if (text === "Отправить") {
         throw new Error("Для этого действия ещё нет рабочего backend API. Запрос не отправлен.");
       } else if (text === "Скачать" || text.includes("Скачать график") || text === "Кредитный договор") {
         throw new Error("Выберите документ в списке. Скачивание доступно только для файлов, возвращённых API.");
