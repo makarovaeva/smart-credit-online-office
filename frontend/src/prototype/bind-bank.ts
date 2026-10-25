@@ -155,8 +155,28 @@ export function bindBank(html: string, name: string, bank: BankState & { draft: 
           if (child.tagName === "DIV" && !parameters && !child.querySelector('input[aria-label="Сообщение"]')) child.remove();
           if (parameters) for (const text of Array.from(child.childNodes)) if (text.nodeType === Node.TEXT_NODE && text.textContent?.trim()) text.textContent = "Параметры заявки:";
         }
-        const message = doc.createElement("p"); message.className = "t"; message.textContent = "Диалог с помощником пока недоступен. Ниже можно подтвердить параметры заявки.";
-        section.querySelector("h2")?.after(message);
+        // История диалога с ИИ-агентом из API
+        const bubbles = bank.chat.length ? bank.chat : [{ sender_type: "ai_agent", content: "Здравствуйте! Подберу кредит под ваш бизнес. Напишите, какая сумма и на какой срок нужна и на что пойдут средства." }];
+        let anchor: Element | null = section.querySelector("h2");
+        for (const item of bubbles) {
+          const client = item.sender_type === "client";
+          const bubble = doc.createElement("div");
+          bubble.dataset.chatMessage = str(item.message_type ?? "text");
+          bubble.style.cssText = client ? "align-self:flex-end;max-width:480px;background:#d92d20;color:#fff;border-radius:16px;padding:14px 16px;white-space:pre-line" : "max-width:560px;background:#f3f4f5;border-radius:16px;padding:14px 16px;white-space:pre-line";
+          bubble.textContent = str(item.content);
+          const fields = object(object(item.card_payload).fields);
+          if (item.message_type === "confirmation_card") {
+            const card = doc.createElement("div"); card.style.cssText = "margin-top:12px;background:#fff;color:#0b1f35;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px";
+            const rows: [string, unknown][] = [["Сумма", fields.amount ? money(fields.amount) : "—"], ["Срок", fields.term_months ? `${str(fields.term_months)} мес.` : "—"], ["Цель", fields.purpose_label ?? "—"], ["Залог", fields.collateral_label ?? "—"], ["Продукт", fields.product_name ?? "—"]];
+            for (const [label, value] of rows) {
+              const row = doc.createElement("div"); row.style.cssText = "display:flex;justify-content:space-between;gap:16px";
+              const caption = doc.createElement("span"); caption.style.color = "#5c6b7a"; caption.textContent = label;
+              const strong = doc.createElement("b"); strong.textContent = str(value); row.append(caption, strong); card.append(row);
+            }
+            bubble.append(card);
+          }
+          anchor?.after(bubble); anchor = bubble;
+        }
         if (app.id && Array.isArray(app.available_actions) && app.available_actions.includes("upload_documents")) {
           const upload = doc.createElement("label"); upload.style.cssText = "border:1px dashed #5c6b7a;border-radius:12px;padding:16px;cursor:pointer";
           upload.textContent = "Выбрать документ для заявки";

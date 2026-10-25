@@ -66,7 +66,7 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
         }
       }
       let products: ObjectData[] = []; let loans: ObjectData[] = []; let company: ObjectData | null = null;
-      let offer: ObjectData | null = null; let contract: ObjectData | null = null; let documents: ObjectData[] = []; let requests: ObjectData[] = [];
+      let offer: ObjectData | null = null; let contract: ObjectData | null = null; let documents: ObjectData[] = []; let requests: ObjectData[] = []; let chat: ObjectData[] = [];
       if (employee) {
         products = list(await optional("/products"));
         company = detail ? object(detail.company) : null;
@@ -89,13 +89,21 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
           if (current.includes("Docs")) documents = list(await optional(`/applications/${id}/documents`));
           if (current.includes("MissingDocs")) requests = list(await optional(`/applications/${id}/info-requests`));
         }
+        if (current.includes("Chat")) {
+          // Диалог по выбранной заявке; при оформлении новой - сообщения до создания заявки
+          const companyId = (!drafting.current && application?.company_id) || list(user.companies)[0]?.company_id;
+          if (companyId) {
+            const rows = list(await optional(`/chat/messages?company_id=${companyId}${!drafting.current && id ? `&application_id=${id}` : ""}`));
+            chat = drafting.current || !id ? rows.filter(m => !m.application_id) : rows;
+          }
+        }
         if (current.includes("Profile")) {
           const companyId = application?.company_id ?? list(user.companies)[0]?.company_id;
           if (companyId) { const value = await optional(`/companies/${companyId}`); company = value ? object(value) : null; }
         }
       }
       if (requestId !== sequence.current) return;
-      setState(previous => ({ ...previous, user, applications, application, detail, products, loans, company, offer, contract, documents, requests, warnings, loading: false }));
+      setState(previous => ({ ...previous, user, applications, application, detail, products, loans, company, offer, contract, documents, requests, chat, warnings, loading: false }));
       if (!employee && current.includes("_Home") && !current.includes("Schedule") && !current.includes("Modal")) {
         const next = homeScene(application); if (next !== current) transition(next, true);
       }
@@ -203,6 +211,17 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
           body = { decision_type: approve ? "approved" : "conditional_approval", approved_amount: approve ? app?.requested_amount : cleanAmount(inputs[0]?.value ?? ""), approved_term_months: approve ? app?.requested_term_months : Number(inputs[1]?.value), interest_rate: rate, comment: textarea, conditions: approve ? list(memo.recommended_conditions) : inputs[3]?.value ? [{ code: "security", description: inputs[3].value }] : [] };
         }
         await post(`/backoffice/applications/${id}/decision`, body); await load(id); transition("U_Workspace.dc.html");
+      } else if (text === "Отправить" && current.includes("Chat") && root.querySelector<HTMLInputElement>('input[aria-label="Сообщение"]')?.value.trim()) {
+        const input = root.querySelector<HTMLInputElement>('input[aria-label="Сообщение"]');
+        const content = input?.value.trim() ?? "";
+        const companyId = (!drafting.current && app?.company_id) || list(latest.current.user?.companies)[0]?.company_id;
+        if (!companyId) throw new Error("Нет компании для диалога");
+        const exchange = await post("/chat/messages", { company_id: companyId, application_id: !drafting.current && id ? id : null, content, client_message_id: crypto.randomUUID() });
+        if (input) input.value = "";
+        // Карточка агента заполняет параметры заявки; подтверждает их клиент
+        const fields = object(object(object(exchange.reply).card_payload).fields);
+        if (fields.amount || fields.term_months) setDraft(previous => ({ ...previous, amount: fields.amount ? String(Math.round(Number(fields.amount))) : previous.amount, term: fields.term_months ? Number(fields.term_months) : previous.term, purpose: fields.purpose_label ? str(fields.purpose_label) : previous.purpose, collateral: fields.collateral_label ? str(fields.collateral_label) : previous.collateral }));
+        await load(id);
       } else if (text === "Отправить" && id && latest.current.requests.some(r => r.status === "open")) {
         const open = latest.current.requests.filter(r => r.status === "open");
         if (open.length !== 1) throw new Error("Выберите конкретный дозапрос перед отправкой ответа");

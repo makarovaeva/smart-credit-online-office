@@ -163,6 +163,56 @@
           "id": "7c2c7bbb-a204-5da1-8cde-f68a62782fef"
         },
         {
+          "name": "Клиент: ИИ-агенту - параметры кредита",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{clientToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat",
+                "messages"
+              ]
+            },
+            "description": "Агент разбирает сумму, срок и цель и возвращает карточку подтверждения с подходящим продуктом. Заявку клиент создаёт обычными командами.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company_id\": \"{{companyId}}\",\n  \"content\": \"Нужно 3 млн на 2 года на пополнение оборотных средств\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('pm.response.json().reply.message_type = confirmation_card', () => pm.expect(pm.response.json().reply.message_type).to.eql(\"confirmation_card\"));",
+                  "pm.test('pm.response.json().reply.card_payload.fields.amount = 3000000.00', () => pm.expect(pm.response.json().reply.card_payload.fields.amount).to.eql(\"3000000.00\"));"
+                ]
+              }
+            }
+          ],
+          "id": "852bf900-6de0-5ccc-880b-7eec5a362f01"
+        },
+        {
           "name": "Каталог продуктов",
           "request": {
             "method": "GET",
@@ -832,6 +882,52 @@
             }
           ],
           "id": "f4432ed9-d5e6-5a1a-937e-7b92f181acad"
+        },
+        {
+          "name": "Клиент: сообщения агента по заявке",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{clientToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chat/messages?company_id={{companyId}}&application_id={{applicationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chat",
+                "messages"
+              ],
+              "query": [
+                {
+                  "key": "company_id",
+                  "value": "{{companyId}}"
+                },
+                {
+                  "key": "application_id",
+                  "value": "{{applicationId}}"
+                }
+              ]
+            },
+            "description": "Агент сам пишет о событиях: оффер, договор на подпись, зачисление."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('есть сообщение о зачислении', () => pm.expect(pm.response.json().map(m => m.content).join(' ')).to.include('Средства зачислены'));"
+                ]
+              }
+            }
+          ],
+          "id": "abf245e2-ce51-5519-8f5f-5c73a1fc1ddf"
         },
         {
           "name": "Клиент: мои кредиты",

@@ -11,6 +11,7 @@ erDiagram
     users ||--o{ applications : "applicant / assignee"
     credit_products ||--o{ applications : ""
     applications ||--o{ application_consents : ""
+    companies ||--o{ chat_messages : "диалог с ИИ-агентом"
     applications ||--o{ pre_approvals : ""
     applications ||--o{ application_status_history : ""
     applications ||--o{ info_requests : ""
@@ -168,6 +169,13 @@ erDiagram
         numeric balance_after
         string status "scheduled | paid | overdue"
     }
+    chat_messages {
+        string sender_type "client | ai_agent"
+        string message_type "text | confirmation_card | document_request | status_notification | rejection_notice"
+        jsonb card_payload
+        string client_message_id
+        string generated_by "rules | llm:<модель>"
+    }
     notifications {
         string type
         string title
@@ -200,6 +208,7 @@ erDiagram
 | `company_owners` | Проверка собственников по санкционным спискам и основание эскалации «сложная структура владения» |
 | Сырые ответы внешних источников в `external_checks.result` (JSONB) | Контракты моков могут меняться; сохраняется доказательная база для решения |
 | Профиль компании — снимок в `companies` / `company_owners` (`services/companies.sync_company`) | Реквизиты, руководитель и учредители — из (мока) ЕГРЮЛ, контакты и расчётный счёт — данные клиента банка; снимок обновляется при привязке и запуске сида, фактический адрес и число сотрудников от клиента не затираются. `company_owners.has_signing_authority` + `head_has_signing_authority` дают список подписантов |
+| `chat_messages` у компании, `application_id` — необязательный | Диалог начинается до заявки (подбор параметров); при создании черновика сообщения без заявки привязываются к нему. Уникальный `(company_id, client_message_id)` защищает от дублей при повторе запроса; `generated_by` показывает, кто сформулировал ответ — шаблоны или LLM |
 | `users.phone` уникален | Клиент входит по номеру телефона |
 | `applications.assignee_id` ставится при входе на этап | Аналитик и андеррайтер работают со своими заявками; назначение — в `services/assignment.py`, вызывается из `transition()` |
 | `application_status_history` | Аудит (кто, когда, почему изменил статус) и таймлайн в кабинете клиента |

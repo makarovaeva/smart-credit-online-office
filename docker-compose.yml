@@ -40,9 +40,17 @@ services:
       # auto - договор готовится сразу; analyst - его готовит кредитный аналитик
       CONTRACT_PREPARATION: ${CONTRACT_PREPARATION:-auto}
       ML_SERVICE_URL: http://ml:8000
+      # LLM для ответов ИИ-агента в чате (OpenAI-совместимый API, модель с открытыми весами).
+      # Пусто - ответы по шаблонам. Ollama на хосте: http://host.docker.internal:11434/v1
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_MODEL: ${LLM_MODEL:-qwen2.5:3b-instruct}
+      LLM_API_KEY: ${LLM_API_KEY:-}
       # Файлы документов заявок - в томе documents
       DOCUMENT_STORAGE_DIR: /var/lib/smart-credit/documents
       DOCUMENT_MAX_SIZE_MB: ${DOCUMENT_MAX_SIZE_MB:-20}
+    # LLM на хосте (Ollama и т.п.) доступна по host.docker.internal и в Linux
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./data:/data:ro
       - documents:/var/lib/smart-credit/documents
