@@ -76,6 +76,10 @@ def _months_ago(today: date, months: int) -> date:
     return date(total // 12, total % 12 + 1, min(today.day, 28))
 
 
+def _phone(rng: random.Random) -> str:
+    return f"+7 495 {rng.randint(100, 999)}-{rng.randint(10, 99)}-{rng.randint(10, 99)}"
+
+
 def _person(rng: random.Random) -> str:
     return f"{rng.choice(_LAST_NAMES)} {rng.choice(_FIRST_NAMES)} {rng.choice(_PATRONYMICS)}"
 
@@ -156,7 +160,11 @@ def _healthy(inn: str, today: date) -> dict[str, Any]:
             "has_signing_authority": True,
         },
         "owners": owners,
-        "contacts": {"phone": None, "email": f"finance@{inn}.example"},
+        "contacts": {
+            # Отдельный генератор: не сдвигает случайные значения остальных полей профиля
+            "phone": _phone(_rng(f"{inn}:phone")),
+            "email": f"finance@{inn}.example",
+        },
         "fns_data": {
             "retrieved_at": retrieved,
             "egrul_status": "active",

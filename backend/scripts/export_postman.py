@@ -205,6 +205,19 @@ def build_collection() -> dict[str, Any]:
             tests=[js_set("companyId", "pm.response.json().companies[0].company_id")],
         ),
         request(
+            "Клиент: профиль компании",
+            "GET",
+            "/companies/{{companyId}}",
+            token="clientToken",
+            description="Реквизиты, руководитель и владельцы из ЕГРЮЛ, контакты и расчётный счёт.",
+            tests=[
+                js_expect("pm.response.json().inn", "7701000001"),
+                "pm.test('есть руководитель и счёт', () => { const c = pm.response.json(); "
+                "pm.expect(c.head.full_name).to.be.a('string'); "
+                "pm.expect(c.settlement_account.account_number).to.match(/^40702810/); });",
+            ],
+        ),
+        request(
             "Каталог продуктов",
             "GET",
             "/products",
@@ -558,6 +571,21 @@ def build_collection() -> dict[str, Any]:
             "/backoffice/applications",
             token="clientToken",
             status=403,
+        ),
+        request(
+            "409: компания уже привязана",
+            "POST",
+            "/companies",
+            token="clientToken",
+            status=409,
+            body={"inn": "7701000001", "member_role": "owner"},
+        ),
+        request(
+            "404: чужая компания",
+            "GET",
+            "/companies/{{companyId}}",
+            token="counterToken",
+            status=404,
         ),
         request(
             "404: чужая заявка",

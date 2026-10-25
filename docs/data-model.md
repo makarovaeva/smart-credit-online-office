@@ -40,8 +40,11 @@ erDiagram
         string ogrn
         string legal_form "ip | ooo"
         string okved_main
+        string tax_system
         date registration_date
         string actual_address
+        string head_full_name
+        string settlement_account_number
     }
     company_members {
         uuid company_id FK
@@ -53,6 +56,7 @@ erDiagram
         string full_name
         numeric share_percent
         bool is_beneficiary
+        bool has_signing_authority
     }
     credit_products {
         uuid id PK
@@ -195,6 +199,7 @@ erDiagram
 | `pre_approvals` | Клиент видит шансы и диапазон до подачи — ключевой запрос персоны «новый заёмщик» |
 | `company_owners` | Проверка собственников по санкционным спискам и основание эскалации «сложная структура владения» |
 | Сырые ответы внешних источников в `external_checks.result` (JSONB) | Контракты моков могут меняться; сохраняется доказательная база для решения |
+| Профиль компании — снимок в `companies` / `company_owners` (`services/companies.sync_company`) | Реквизиты, руководитель и учредители — из (мока) ЕГРЮЛ, контакты и расчётный счёт — данные клиента банка; снимок обновляется при привязке и запуске сида, фактический адрес и число сотрудников от клиента не затираются. `company_owners.has_signing_authority` + `head_has_signing_authority` дают список подписантов |
 | `users.phone` уникален | Клиент входит по номеру телефона |
 | `applications.assignee_id` ставится при входе на этап | Аналитик и андеррайтер работают со своими заявками; назначение — в `services/assignment.py`, вызывается из `transition()` |
 | `application_status_history` | Аудит (кто, когда, почему изменил статус) и таймлайн в кабинете клиента |

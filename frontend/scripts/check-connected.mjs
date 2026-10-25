@@ -99,6 +99,9 @@ try {
   await navigate("/documents");
   await wait("document.body.innerText.includes('Документов нет')");
   console.log("Documents list loaded from API (no files for this application)");
+  await navigate("/profile");
+  await wait("['7701000001', 'Генеральный директор', 'АО «Альфа-Банк»', 'finance@7701000001.example'].every(t => document.body.innerText.includes(t)) && !document.body.innerText.includes('[ФИО]')");
+  console.log("Company profile shows registry, head, contacts and settlement account from API");
   }
 
   await login("/login", ["+7 999 000-00-03"], "client");

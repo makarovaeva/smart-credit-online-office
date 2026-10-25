@@ -16,6 +16,14 @@ class CompanyOwnerRead(ORMModel):
     inn: str | None
     share_percent: Decimal | None
     is_beneficiary: bool
+    has_signing_authority: bool = False
+
+
+class CompanyHead(BaseModel):
+    full_name: str
+    position: str | None
+    in_position_since: date | None
+    has_signing_authority: bool
 
 
 class CompanyRequisites(BaseModel):
@@ -26,12 +34,17 @@ class CompanyRequisites(BaseModel):
     kpp: str | None
     legal_form: LegalForm
     name: str
+    full_name: str | None = None
     okved_main: str
+    okved_name: str | None = None
+    # usn_income / usn_income_expense / osno / ...
+    tax_system: str | None = None
     registration_date: date
     region: str
     # В формате данных ML адреса и учредителей нет - приходят, только если генератор их отдаёт
     legal_address: str | None
     employees_count: int | None = None
+    head: CompanyHead | None = None
     owners: list[CompanyOwnerRead] = Field(description="Учредители и бенефициары из реестра")
 
 
@@ -42,6 +55,24 @@ class CompanyCreate(BaseModel):
     employees_count: int | None = Field(default=None, ge=0)
 
 
+class SettlementAccount(BaseModel):
+    account_number: str
+    bik: str | None
+    bank_name: str | None
+
+
 class CompanyRead(CompanyRequisites, ORMModel):
+    """Профиль компании: реквизиты и владельцы из реестра, контакты и счёт - данные клиента
+    банка (указаны при открытии счёта)."""
+
     id: uuid.UUID
     actual_address: str | None
+    phone: str | None = None
+    email: str | None = None
+    settlement_account: SettlementAccount | None = None
+    signatories: list[str] = Field(
+        default=[], description="Кто вправе подписывать документы: руководитель и учредители"
+    )
+    member_role: CompanyMemberRole | None = Field(
+        default=None, description="Роль текущего пользователя в компании (для клиента)"
+    )

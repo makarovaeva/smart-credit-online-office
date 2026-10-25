@@ -126,6 +126,43 @@
           "id": "ff9c4192-947b-5119-b156-a0b0e4a2bb97"
         },
         {
+          "name": "Клиент: профиль компании",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{clientToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/companies/{{companyId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "companies",
+                "{{companyId}}"
+              ]
+            },
+            "description": "Реквизиты, руководитель и владельцы из ЕГРЮЛ, контакты и расчётный счёт."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('pm.response.json().inn = 7701000001', () => pm.expect(pm.response.json().inn).to.eql(\"7701000001\"));",
+                  "pm.test('есть руководитель и счёт', () => { const c = pm.response.json(); pm.expect(c.head.full_name).to.be.a('string'); pm.expect(c.settlement_account.account_number).to.match(/^40702810/); });"
+                ]
+              }
+            }
+          ],
+          "id": "7c2c7bbb-a204-5da1-8cde-f68a62782fef"
+        },
+        {
           "name": "Каталог продуктов",
           "request": {
             "method": "GET",
@@ -2770,6 +2807,86 @@
             }
           ],
           "id": "81fd75cf-6a79-501c-a359-7f7d3cabf3a0"
+        },
+        {
+          "name": "409: компания уже привязана",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{clientToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/companies",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "companies"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inn\": \"7701000001\",\n  \"member_role\": \"owner\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ],
+          "id": "e7d9ddb4-97d7-531e-88c9-72f526ecf56e"
+        },
+        {
+          "name": "404: чужая компания",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{counterToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/companies/{{companyId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "companies",
+                "{{companyId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "id": "1c3637b0-5c95-5f4d-9603-5e75cc7f7592"
         },
         {
           "name": "404: чужая заявка",

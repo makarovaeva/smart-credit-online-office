@@ -11,7 +11,7 @@ Postman-коллекция с примерами запросов и сквоз�
 - очереди, карточка и назначение в бэкофисе;
 - `/companies/lookup` на моке ЕГРЮЛ (демо-ИНН — в [`../external-sources.md`](../external-sources.md)).
 
-Остальные эндпоинты пока заглушки (`501`), но контракт зафиксирован: `/products/match`, привязка компаний, `/notifications`.
+Остальные эндпоинты пока заглушки (`501`), но контракт зафиксирован: `/products/match`, `/notifications`.
 
 Этапы конвейера ИИ запускаются сразу после команд клиента. `/consents` возвращает заявку уже в `pre_approved`. `/submit` возвращает её в `underwriter_review`, `analyst_escalation`, `need_additional_data` или `closed` (автоотказ). Подробно — [`../application-lifecycle.md`](../application-lifecycle.md#кредитный-конвейер).
 
@@ -59,8 +59,9 @@ cd backend && uv run python -m scripts.export_openapi
 | GET | `/me` | Пользователь и его компании |
 | GET | `/products` | Каталог продуктов |
 | POST | `/products/match` | Подбор продукта под цель, сумму и срок |
-| GET | `/companies/lookup?inn=` | Реквизиты и учредители из ЕГРЮЛ/ЕГРИП (мок) для предзаполнения |
-| POST/GET | `/companies` | Привязать компанию / мои компании |
+| GET | `/companies/lookup?inn=` | Реквизиты, руководитель и учредители из ЕГРЮЛ/ЕГРИП (мок) для предзаполнения |
+| POST/GET | `/companies` | Привязать компанию по ИНН (реквизиты — из реестра; уже обслуживаемая компания — `409`) / мои компании с ролью |
+| GET | `/companies/{id}` | Профиль компании: организация и деятельность (ОКВЭД, система налогообложения), руководитель, бенефициары с долями, право подписи (`signatories`), телефон, e-mail, расчётный счёт. Чужая — `404` |
 | POST/GET | `/applications` | Создать черновик / мои заявки |
 | GET/PATCH | `/applications/{id}` | Заявка / редактирование черновика |
 | POST/GET | `/applications/{id}/consents` | Согласия на получение данных: `draft → data_collection` |

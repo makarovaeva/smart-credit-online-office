@@ -11,6 +11,8 @@ export const money = (value: unknown) => {
 const date = (value: unknown) => value ? new Date(String(value)).toLocaleDateString("ru-RU") : "—";
 const statuses: Record<string, string> = { draft: "Черновик", pre_approved: "Предварительное одобрение", underwriter_review: "Рассмотрение", analyst_escalation: "Эскалация аналитику", analyst_completed: "Заключение готово", need_additional_data: "Нужны документы", offer_generated: "Оффер сформирован", e_sign: "Договор на подписание", disbursement: "Выдача средств", completed: "Кредит выдан", closed: "Заявка закрыта" };
 Object.assign(statuses, { data_collection: "Сбор данных", submitted: "Заявка отправлена", ai_verification: "Проверка документов", ai_financial_analysis: "Финансовый анализ", ai_risk_scoring: "Оценка риска", decision_routing: "Маршрутизация заявки", offer_accepted: "Оффер принят", offer_rejected: "Оффер отклонён", contract_generation: "Подготовка договора", approved: "Одобрено", conditional_approval: "Одобрено с изменениями", declined: "Отказано", accepted: "Принят", rejected: "Отклонён", active: "Действует", green: "Зелёная зона", yellow: "Жёлтая зона", red: "Красная зона" });
+const legalForms: Record<string, string> = { ooo: "ООО", ip: "ИП" };
+const taxSystems: Record<string, string> = { usn_income: "УСН «Доходы»", usn_income_expense: "УСН «Доходы минус расходы»", osno: "ОСНО", psn: "Патент", eshn: "ЕСХН" };
 export const statusLabel = (value: unknown) => statuses[str(value)] ?? str(value);
 const terminal = (a: ObjectData) => ["closed", "completed"].includes(str(a.status));
 
@@ -103,8 +105,12 @@ export function bindBank(html: string, name: string, bank: BankState & { draft: 
     "Срок": `${str((displayedOffer ? offer.approved_term_months : app.requested_term_months) ?? bank.draft.term)} мес.`, "Ставка": offer.interest_rate ? `${offer.interest_rate}% годовых` : loan.interest_rate ? `${loan.interest_rate}% годовых` : estimatedRate ? `${estimatedRate}% годовых` : "—",
     "Ежемесячный платёж": money(offer.estimated_monthly_payment ?? loan.monthly_payment),
     "Остаток долга": money(loan.outstanding_balance), "Ближайший платёж": object(loan.next_payment).total_amount ? `${money(object(loan.next_payment).total_amount)} · ${date(object(loan.next_payment).due_date)}` : "—",
-    "Полное наименование": company.name, "Организационно-правовая форма": company.legal_form, "ИНН": company.inn, "КПП": company.kpp, "ОГРН / ОГРНИП": company.ogrn,
-    "Дата регистрации": date(company.registration_date), "Основной ОКВЭД": company.okved_main, "Регион ведения бизнеса": company.region, "Число сотрудников": company.employees_count, "Юридический адрес": company.legal_address,
+    "Полное наименование": company.full_name ?? company.name, "Организационно-правовая форма": legalForms[str(company.legal_form)] ?? company.legal_form, "ИНН": company.inn, "КПП": company.kpp ?? "—", "ОГРН / ОГРНИП": company.ogrn,
+    "Дата регистрации": date(company.registration_date), "Основной ОКВЭД": company.okved_name ? `${str(company.okved_main)} · ${str(company.okved_name)}` : company.okved_main, "Система налогообложения": taxSystems[str(company.tax_system)] ?? company.tax_system ?? "—", "Регион ведения бизнеса": company.region, "Число сотрудников": company.employees_count, "Юридический адрес": company.legal_address,
+    "Руководитель": object(company.head).full_name ?? "—", "Должность": object(company.head).position ?? "—",
+    "Бенефициарные владельцы": list(company.owners).filter(o => o.is_beneficiary).map(o => o.share_percent ? `${str(o.full_name)}, ${Number(o.share_percent)}%` : str(o.full_name)).join("; ") || "—",
+    "Право подписи": list(company.signatories).map(str).join(", ") || "—", "Телефон": company.phone ?? "—", "Электронная почта": company.email ?? "—",
+    "Расчётный счёт": object(company.settlement_account).account_number ? `${str(object(company.settlement_account).account_number)} · ${str(object(company.settlement_account).bank_name)}` : "—",
     "DSCR": scoring.dscr, "Debt Burden (аналитический)": scoring.debt_burden ? `${(Number(scoring.debt_burden) * 100).toFixed(2)}%` : "—", "LTV": scoring.ltv === undefined || scoring.ltv === null ? "—" : `${(Number(scoring.ltv) * 100).toFixed(2)}%`,
     "Риск-грейд": scoring.risk_grade, "Уверенность модели": scoring.confidence !== undefined ? `${Number(scoring.confidence) * 100}%` : "—",
     "Стоп-факторы": list(scoring.stop_factors).map(f => str(f.description)).join(", ") || "—",
