@@ -125,19 +125,20 @@ flowchart LR
 
 ## Документация
 
-| Что | Где |
-|---|---|
-| Жизненный цикл заявки, диаграмма состояний, кредитная политика, конвейер, выдача | [`docs/application-lifecycle.md`](docs/application-lifecycle.md) |
-| Модель данных (ER-диаграмма) | [`docs/data-model.md`](docs/data-model.md) |
-| Целевая модель данных MVP (профиль заёмщика, заявка, оценка, оффер, договор) | [`docs/credit_mmb_data_model_updated.md`](docs/credit_mmb_data_model_updated.md) |
-| Описание API и соглашения | [`docs/api/README.md`](docs/api/README.md) |
-| OpenAPI 3.1 | [`docs/api/openapi.json`](docs/api/openapi.json), [`docs/api/openapi.yaml`](docs/api/openapi.yaml) |
-| Postman-коллекция и окружение | [`docs/postman/`](docs/postman/README.md) |
-| Моки внешних источников, демо-ИНН, признаки заёмщика | [`docs/external-sources.md`](docs/external-sources.md) |
-| Frontend: маршруты и подключённые методы API | [`docs/frontend-api-status.md`](docs/frontend-api-status.md) |
-| ML: генератор синтетических данных | [`ml/synthetic_data/README.md`](ml/synthetic_data/README.md) |
-| ML: скоринг и контракт признаков | [`ml/scoring/README.md`](ml/scoring/README.md), [`ml/scoring/FEATURE_CONTRACT.md`](ml/scoring/FEATURE_CONTRACT.md) |
-| Сторонние компоненты и лицензии | [`THIRD_PARTY_NOTICES`](THIRD_PARTY_NOTICES) |
+| Что                                                                                                                      | Где                                                                                                                                                                                                                   |
+|--------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Продуктовый анализ: исследование пользователей, клиентский путь, гипотеза и метрики, ключевой сценарий, кредитная логика | [Figma](https://www.figma.com/design/YxuiZBnCIsE7KvlEfopo3i/%D0%A5%D0%B0%D0%BA%D0%B0%D1%82%D0%BE%D0%BD-%D0%90%D0%BB%D1%8C%D1%84%D0%B0-%D0%91%D1%83%D0%B4%D1%83%D1%89%D0%B5%D0%B5-26?node-id=0-1&t=zeuDaEfI3XuEB9Lw-1) |
+| Жизненный цикл заявки, диаграмма состояний, кредитная политика, конвейер, выдача                                         | [`docs/application-lifecycle.md`](docs/application-lifecycle.md)                                                                                                                                                      |
+| Модель данных (ER-диаграмма)                                                                                             | [`docs/data-model.md`](docs/data-model.md)                                                                                                                                                                            |
+| Целевая модель данных MVP (профиль заёмщика, заявка, оценка, оффер, договор)                                             | [`docs/credit_mmb_data_model_updated.md`](docs/credit_mmb_data_model_updated.md)                                                                                                                                      |
+| Описание API и соглашения                                                                                                | [`docs/api/README.md`](docs/api/README.md)                                                                                                                                                                            |
+| OpenAPI 3.1                                                                                                              | [`docs/api/openapi.json`](docs/api/openapi.json), [`docs/api/openapi.yaml`](docs/api/openapi.yaml)                                                                                                                    |
+| Postman-коллекция и окружение                                                                                            | [`docs/postman/`](docs/postman/README.md)                                                                                                                                                                             |
+| Моки внешних источников, демо-ИНН, признаки заёмщика                                                                     | [`docs/external-sources.md`](docs/external-sources.md)                                                                                                                                                                |
+| Frontend: маршруты и подключённые методы API                                                                             | [`docs/frontend-api-status.md`](docs/frontend-api-status.md)                                                                                                                                                          |
+| ML: генератор синтетических данных                                                                                       | [`ml/synthetic_data/README.md`](ml/synthetic_data/README.md)                                                                                                                                                          |
+| ML: скоринг и контракт признаков                                                                                         | [`ml/scoring/README.md`](ml/scoring/README.md), [`ml/scoring/FEATURE_CONTRACT.md`](ml/scoring/FEATURE_CONTRACT.md)                                                                                                    |
+| Сторонние компоненты и лицензии                                                                                          | [`THIRD_PARTY_NOTICES`](THIRD_PARTY_NOTICES)                                                                                                                                                                          |
 
 ## Структура репозитория
 
