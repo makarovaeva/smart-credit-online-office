@@ -2,9 +2,9 @@
 
 Два прогона:
 - после согласий: data_collection -> pre_approved (предварительный расчёт);
-- после подачи: submitted -> ai_verification -> ai_financial_analysis -> ai_risk_scoring
-  -> decision_routing -> underwriter_review | analyst_escalation | closed (автоотказ)
-  или need_additional_data, если не хватает финансовых данных.
+- после подачи: submitted -> ai_verification -> ai_risk_scoring -> decision_routing
+  -> ai_financial_analysis -> underwriter_review (зелёная зона) | analyst_escalation (жёлтая)
+  | closed (автоотказ) или need_additional_data, если не хватает финансовых данных.
 
 Каждый прогон - одна транзакция: при ошибке заявка остаётся на исходном этапе.
 Финальное решение по зелёной и жёлтой зоне принимает андеррайтер.
@@ -405,7 +405,8 @@ async def _request_financials(session: AsyncSession, application: Application) -
 
 
 async def run_assessment(session: AsyncSession, application: Application) -> None:
-    """От проверки данных до маршрутизации: андеррайтер, аналитик или автоотказ."""
+    """Проверка -> скоринг -> маршрутизация: зелёная зона через финансовый анализ
+    к андеррайтеру, жёлтая - к аналитику, красная - автоотказ."""
     product = await session.get(CreditProduct, application.product_id)
     assert product is not None
 
@@ -416,11 +417,12 @@ async def run_assessment(session: AsyncSession, application: Application) -> Non
         await session.commit()
         return
 
-    await transition(session, application, S.AI_FINANCIAL_ANALYSIS, SYSTEM)
     await transition(session, application, S.AI_RISK_SCORING, SYSTEM)
     scoring_result = _scoring_result(application, features, scoring, policy)
     session.add(scoring_result)
     await session.flush()
+    # AI Credit Memo нужно на любом маршруте: андеррайтеру - для решения, аналитику - как основа
+    # заключения, при автоотказе - как обоснование
     session.add(_credit_memo(application, scoring_result, features, scoring, policy))
 
     await transition(session, application, S.DECISION_ROUTING, SYSTEM)
@@ -438,6 +440,7 @@ async def run_assessment(session: AsyncSession, application: Application) -> Non
         case RiskZone.YELLOW:
             await transition(session, application, S.ANALYST_ESCALATION, SYSTEM)
         case RiskZone.GREEN:
+            await transition(session, application, S.AI_FINANCIAL_ANALYSIS, SYSTEM)
             await transition(session, application, S.UNDERWRITER_REVIEW, SYSTEM)
     await session.commit()
 

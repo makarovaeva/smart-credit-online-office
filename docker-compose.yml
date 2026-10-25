@@ -37,6 +37,8 @@ services:
       BORROWER_DATASET_PATH: ${BORROWER_DATASET_PATH:-}
       # ml - модель скоринга из сервиса ml; rules - встроенные правила
       SCORING_MODEL: ${SCORING_MODEL:-ml}
+      # auto - договор готовится сразу; analyst - его готовит кредитный аналитик
+      CONTRACT_PREPARATION: ${CONTRACT_PREPARATION:-auto}
       ML_SERVICE_URL: http://ml:8000
     volumes:
       - ./data:/data:ro

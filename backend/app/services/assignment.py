@@ -15,6 +15,8 @@ from app.models.enums import ApplicationStatus, UserRole
 STAGE_ROLES = {
     ApplicationStatus.ANALYST_ESCALATION: UserRole.CREDIT_ANALYST,
     ApplicationStatus.UNDERWRITER_REVIEW: UserRole.UNDERWRITER,
+    # Подготовка договора кредитным аналитиком (CONTRACT_PREPARATION=analyst)
+    ApplicationStatus.CONTRACT_GENERATION: UserRole.CREDIT_ANALYST,
 }
 
 

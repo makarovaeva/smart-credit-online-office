@@ -3298,6 +3298,95 @@
           }
         }
       }
+    },
+    "/api/v1/backoffice/applications/{application_id}/contract": {
+      "post": {
+        "tags": [
+          "backoffice"
+        ],
+        "summary": "Prepare Contract",
+        "description": "Подготовка кредитного договора аналитиком после принятия оффера:\ncontract_generation -> e_sign. Нужна при CONTRACT_PREPARATION=analyst; в режиме auto\nдоговор готовится сразу при принятии оффера. Повторный вызов возвращает тот же договор.",
+        "operationId": "prepare_contract_api_v1_backoffice_applications__application_id__contract_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoanContractRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Нет или невалидный токен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Недостаточно прав",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Объект не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Действие недопустимо в текущем статусе заявки или версия устарела",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

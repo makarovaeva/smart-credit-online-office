@@ -16,21 +16,23 @@ TRANSITIONS: dict[tuple[ApplicationStatus, ApplicationStatus], frozenset[ActorTy
     (S.PRE_APPROVED, S.SUBMITTED): CLIENT,
     (S.PRE_APPROVED, S.CLOSED): CLIENT,  # отказ после предварительного расчёта
     # Блок 02. Анализ ИИ
+    # Порядок этапов по доске от 23.10: проверка -> скоринг -> маршрутизация -> (зелёная зона)
+    # финансовый анализ и AI Credit Memo -> андеррайтер
     (S.SUBMITTED, S.AI_VERIFICATION): SYSTEM,
-    (S.AI_VERIFICATION, S.AI_FINANCIAL_ANALYSIS): SYSTEM,
+    (S.AI_VERIFICATION, S.AI_RISK_SCORING): SYSTEM,
     (S.AI_VERIFICATION, S.NEED_ADDITIONAL_DATA): SYSTEM,
     # Документы досланы: дозапрос ИИ - повторная проверка комплекта,
     # дозапрос андеррайтера - сразу повторное рассмотрение
     (S.NEED_ADDITIONAL_DATA, S.AI_VERIFICATION): CLIENT,
     (S.NEED_ADDITIONAL_DATA, S.UNDERWRITER_REVIEW): CLIENT,
-    (S.AI_FINANCIAL_ANALYSIS, S.AI_RISK_SCORING): SYSTEM,
     (S.AI_RISK_SCORING, S.NEED_ADDITIONAL_DATA): SYSTEM,
     (S.AI_RISK_SCORING, S.DECISION_ROUTING): SYSTEM,
-    # Блок 03. Маршрутизация: зелёная зона - андеррайтеру, жёлтая - аналитику,
-    # красная (стоп-фактор) - автоотказ
-    (S.DECISION_ROUTING, S.UNDERWRITER_REVIEW): SYSTEM,
+    # Блок 03. Маршрутизация: зелёная зона - финансовый анализ и андеррайтер,
+    # жёлтая - аналитик, красная (стоп-фактор) - автоотказ
+    (S.DECISION_ROUTING, S.AI_FINANCIAL_ANALYSIS): SYSTEM,
     (S.DECISION_ROUTING, S.ANALYST_ESCALATION): SYSTEM,
     (S.DECISION_ROUTING, S.CLOSED): SYSTEM,
+    (S.AI_FINANCIAL_ANALYSIS, S.UNDERWRITER_REVIEW): SYSTEM,
     # Блок 04. Исключения
     (S.ANALYST_ESCALATION, S.ANALYST_COMPLETED): ANALYST,
     (S.ANALYST_COMPLETED, S.UNDERWRITER_REVIEW): SYSTEM,
@@ -46,7 +48,8 @@ TRANSITIONS: dict[tuple[ApplicationStatus, ApplicationStatus], frozenset[ActorTy
     (S.OFFER_REJECTED, S.CLOSED): SYSTEM,
     # Блок 07. Выдача (подписание и перечисление смоделированы)
     (S.OFFER_ACCEPTED, S.CONTRACT_GENERATION): SYSTEM,
-    (S.CONTRACT_GENERATION, S.E_SIGN): SYSTEM,
+    # Договор готовит система (CONTRACT_PREPARATION=auto) или кредитный аналитик
+    (S.CONTRACT_GENERATION, S.E_SIGN): SYSTEM | ANALYST,
     (S.E_SIGN, S.DISBURSEMENT): CLIENT,
     (S.DISBURSEMENT, S.COMPLETED): SYSTEM,
 }
