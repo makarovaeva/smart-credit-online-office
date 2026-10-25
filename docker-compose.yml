@@ -43,7 +43,7 @@ services:
       # LLM для ответов ИИ-агента в чате (OpenAI-совместимый API, модель с открытыми весами).
       # Пусто - ответы по шаблонам. Ollama на хосте: http://host.docker.internal:11434/v1
       LLM_BASE_URL: ${LLM_BASE_URL:-}
-      LLM_MODEL: ${LLM_MODEL:-qwen2.5:3b-instruct}
+      LLM_MODEL: ${LLM_MODEL:-qwen2.5:7b-instruct}
       LLM_API_KEY: ${LLM_API_KEY:-}
       # Файлы документов заявок - в томе documents
       DOCUMENT_STORAGE_DIR: /var/lib/smart-credit/documents

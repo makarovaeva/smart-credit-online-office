@@ -1,3 +1,12 @@
+THIRD-PARTY NOTICES
+===================
+
+Умный кредитный кабинет предпринимателя (Альфа-Хак 2026). Здесь перечислены сторонние
+компоненты, которые используются при сборке и запуске проекта, их лицензии и источники.
+Точные версии зафиксированы в lock-файлах: backend/uv.lock, ml/service/requirements.lock,
+frontend/package-lock.json. Тексты лицензий распространяются вместе с установленными
+пакетами. Платные API и подписки не используются.
+
 Frontend components (initial implementation)
 ============================================
 Next.js — MIT — https://github.com/vercel/next.js
@@ -16,11 +25,132 @@ ESLint — MIT — https://github.com/eslint/eslint
 Exact direct and transitive versions are recorded in frontend/package-lock.json.
 Upstream license files remain in the installed packages.
 
-Integration notes
-=================
-Company registry, tax, credit bureau and compliance integrations are simulated
-locally by backend/app/integrations. Demonstration data is synthetic.
-No external AI service is required by the current frontend implementation.
+Транзитивные production-зависимости фронта (frontend/package-lock.json, 380 пакетов):
+MIT 306, ISC 24, Apache-2.0 19, BSD-3-Clause 7, BSD-2-Clause 5, BlueOak-1.0.0 2,
+CC-BY-4.0 1, 0BSD 1, MIT OR CC0-1.0 1. Отдельно: sharp (обработка изображений Next.js) —
+Apache-2.0, его платформенные бинарники libvips (@img/sharp-libvips-*) — LGPL-3.0-or-later,
+необязательные зависимости, ставятся только для своей платформы, исходники libvips:
+https://github.com/libvips/libvips
 
-Scope: this is the initial frontend inventory. Backend/ML component, model and
-dataset notices must be completed by their owners before hackathon submission.
+Backend (Python, образ smart-credit/backend)
+============================================
+Runtime-зависимости из backend/uv.lock (без dev-группы):
+
+alembic 1.20.0 — MIT — https://alembic.sqlalchemy.org
+annotated-doc 0.0.5 — MIT — https://github.com/fastapi/annotated-doc
+annotated-types 0.8.0 — MIT — https://github.com/annotated-types/annotated-types
+anyio 4.15.1 — MIT — https://github.com/agronholm/anyio
+asyncpg 0.32.0 — Apache-2.0 — https://github.com/MagicStack/asyncpg
+click 8.5.0 — BSD-3-Clause — https://github.com/pallets/click/
+dnspython 2.9.0 — ISC — https://www.dnspython.org
+email-validator 2.3.0 — Unlicense — https://github.com/JoshData/python-email-validator
+fastapi 0.156.1 — MIT — https://github.com/fastapi/fastapi
+greenlet 3.5.6 — MIT AND PSF-2.0 — https://greenlet.readthedocs.io
+h11 0.16.0 — MIT — https://github.com/python-hyper/h11
+httptools 0.9.0 — MIT — https://github.com/MagicStack/httptools
+idna 3.20 — BSD-3-Clause — https://github.com/kjd/idna
+Mako 1.4.3 — MIT — https://www.makotemplates.org/
+MarkupSafe 3.0.4 — BSD-3-Clause — https://github.com/pallets/markupsafe/
+opentelemetry-api 1.45.1 — Apache-2.0 — https://github.com/open-telemetry/opentelemetry-python/tree/main/opentelemetry-api
+pydantic 2.14.1 — MIT — https://github.com/pydantic/pydantic
+pydantic_core 2.50.1 — MIT — https://github.com/pydantic
+pydantic-settings 2.16.1 — MIT — https://github.com/pydantic/pydantic-settings
+python-dotenv 1.2.4 — BSD-3-Clause — https://github.com/theskumar/python-dotenv
+python-multipart 0.0.32 — Apache-2.0 — https://github.com/Kludex/python-multipart
+PyYAML 6.0.3 — MIT — https://github.com/yaml/pyyaml
+SQLAlchemy 2.1.5 — MIT — https://www.sqlalchemy.org
+starlette 1.9.0 — BSD-3-Clause — https://github.com/Kludex/starlette
+typing_extensions 4.16.0 — PSF-2.0 — https://github.com/python/typing_extensions
+typing-inspection 0.4.4 — MIT — https://github.com/pydantic/typing-inspection
+uvicorn 0.54.0 — BSD-3-Clause — https://uvicorn.dev/
+uvloop 0.23.0 — Apache-2.0 OR MIT — https://github.com/MagicStack/uvloop
+watchfiles 1.3.0 — MIT — https://github.com/samuelcolvin/watchfiles
+websockets 17.3 — BSD-3-Clause — https://github.com/python-websockets/websockets
+
+Dev-зависимости (тесты и линтеры, в образ не попадают): pytest (MIT), pytest-asyncio
+(Apache-2.0), httpx (BSD-3-Clause), ruff (MIT), openapi-spec-validator (Apache-2.0),
+PyYAML (MIT). Группа ml (генератор синтетических данных, в образ API не попадает):
+numpy (BSD-3-Clause).
+
+ML-сервис скоринга (Python, образ smart-credit/ml)
+==================================================
+Зависимости из ml/service/requirements.lock:
+
+annotated-doc 0.0.5 — MIT — https://github.com/fastapi/annotated-doc
+annotated-types 0.8.0 — MIT — https://github.com/annotated-types/annotated-types
+anyio 4.15.1 — MIT — https://github.com/agronholm/anyio
+catboost 1.2.8 — Apache-2.0 — https://github.com/catboost/catboost
+click 8.5.0 — BSD-3-Clause — https://github.com/pallets/click/
+cloudpickle 3.1.2 — BSD-3-Clause — https://github.com/cloudpipe/cloudpickle
+contourpy 1.4.0 — BSD-3-Clause — https://github.com/contourpy/contourpy
+cycler 0.12.1 — BSD-3-Clause — https://matplotlib.org/cycler/
+fastapi 0.162.0 — MIT — https://github.com/fastapi/fastapi
+fonttools 4.67.0 — MIT — http://github.com/fonttools/fonttools
+graphviz 0.21 — MIT — https://github.com/xflr6/graphviz
+h11 0.16.0 — MIT — https://github.com/python-hyper/h11
+idna 3.20 — BSD-3-Clause — https://github.com/kjd/idna
+joblib 1.5.3 — BSD-3-Clause — https://joblib.readthedocs.io
+kiwisolver 1.5.1 — BSD-3-Clause — https://github.com/nucleic/kiwi
+lightgbm 4.6.0 — MIT — https://github.com/microsoft/LightGBM
+matplotlib 3.10.8 — Matplotlib License (PSF-based) — https://matplotlib.org
+narwhals 2.27.1 — MIT — https://github.com/narwhals-dev/narwhals
+numpy 2.3.5 — BSD-3-Clause — https://numpy.org
+opentelemetry-api 1.45.1 — Apache-2.0 — https://github.com/open-telemetry/opentelemetry-python/tree/main/opentelemetry-api
+packaging 26.3 — Apache-2.0 OR BSD-2-Clause — https://github.com/pypa/packaging
+pandas 2.2.3 — BSD-3-Clause — https://pandas.pydata.org
+pillow 13.0.0 — MIT-CMU — https://python-pillow.org
+plotly 7.1.0 — MIT — https://plotly.com/python/
+pydantic 2.14.1 — MIT — https://github.com/pydantic/pydantic
+pydantic_core 2.50.1 — MIT — https://github.com/pydantic
+pyparsing 3.3.3 — MIT — https://github.com/pyparsing/pyparsing/
+python-dateutil 3.0.0 — Apache-2.0 AND BSD-3-Clause — https://github.com/dateutil/dateutil
+pytz 2026.5 — MIT — https://github.com/stub42/pytz.git
+scikit-learn 1.8.0 — BSD-3-Clause — https://scikit-learn.org
+scipy 1.18.1 — BSD-3-Clause — https://scipy.org/
+shap 0.54.1 — MIT — http://github.com/shap/shap
+six 1.17.0 — MIT — https://github.com/benjaminp/six
+slicer 0.0.8 — MIT — https://github.com/interpretml/slicer
+starlette 1.10.0 — BSD-3-Clause — https://github.com/Kludex/starlette
+threadpoolctl 3.7.0 — BSD-3-Clause — https://github.com/joblib/threadpoolctl
+tqdm 4.70.1 — MPL-2.0 AND MIT — https://tqdm.github.io
+typing_extensions 4.16.0 — PSF-2.0 — https://github.com/python/typing_extensions
+typing-inspection 0.4.4 — MIT — https://github.com/pydantic/typing-inspection
+tzdata 2026.5 — Apache-2.0 — https://github.com/python/tzdata
+uvicorn 0.54.0 — BSD-3-Clause — https://uvicorn.dev/
+colorama 0.4.6 (только Windows) — BSD-3-Clause — https://github.com/tartley/colorama
+
+Модель скоринга
+===============
+Модель CatBoost обучается при сборке образа ml (ml/Dockerfile) на синтетических данных
+генератора проекта (ml/synthetic_data, фиксированный seed). Сторонних предобученных весов
+нет. Метки дефолта синтетические (label_source = SIMULATED_DEMO_DEFAULTS): модель
+демонстрирует подход и не является проверенной вероятностью дефолта.
+
+Данные
+======
+Все данные заёмщиков синтетические: генератор ml/synthetic_data, локальные моки ЕГРЮЛ,
+ФНС, БКИ и комплаенса в backend/app/integrations (synthetic.py, демо-ИНН), демо-учётки
+backend/scripts/seed.py. Реальные персональные данные и выгрузки внешних систем не
+используются. Внешние системы (ЕГРЮЛ/ЕГРИП, ФНС, БКИ, санкционные списки) не вызываются.
+
+LLM для ИИ-агента (опционально, не входит в поставку)
+=====================================================
+По умолчанию ИИ-агент в чате отвечает по шаблонам без модели. При заданном LLM_BASE_URL
+backend обращается к OpenAI-совместимому API локального сервера с моделью с открытыми
+весами. Модель и сервер в репозиторий и образы не входят, их устанавливает пользователь:
+- Qwen2.5-7B-Instruct (по умолчанию, LLM_MODEL=qwen2.5:7b-instruct) — Apache-2.0 —
+  https://huggingface.co/Qwen/Qwen2.5-7B-Instruct
+- для слабых машин подходит Qwen2.5-1.5B-Instruct — Apache-2.0 —
+  https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct
+- сервер, например Ollama — MIT — https://github.com/ollama/ollama
+
+Базовые образы Docker
+=====================
+postgres:16.15-alpine — PostgreSQL License — https://www.postgresql.org/about/licence/
+python:3.12.15-slim — PSF-2.0 (Python), Debian — https://hub.docker.com/_/python
+node:24.22.1-alpine — MIT (Node.js), Alpine Linux — https://hub.docker.com/_/node
+uv 0.13.5 (ставится при сборке backend) — Apache-2.0 OR MIT — https://github.com/astral-sh/uv
+
+Инструменты проверки (не входят в поставку)
+===========================================
+Newman (postman/newman:6-alpine) — Apache-2.0 — https://github.com/postmanlabs/newman
