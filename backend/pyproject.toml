@@ -12,6 +12,7 @@ dependencies = [
     "asyncpg>=0.30",
     "alembic>=1.14",
     "python-multipart>=0.0.20",
+    "fpdf2>=2.8",
 ]
 
 [dependency-groups]

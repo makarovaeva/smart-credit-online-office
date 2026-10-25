@@ -432,6 +432,28 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         request(
+            "Клиент: договор в PDF",
+            "GET",
+            "/applications/{{applicationId}}/contract/document",
+            token="clientToken",
+            description="Кредитный договор с графиком платежей (демонстрационный документ).",
+            tests=[
+                "pm.test('PDF', () => pm.expect(pm.response.headers.get('Content-Type'))"
+                ".to.include('application/pdf'));"
+            ],
+        ),
+        request(
+            "Клиент: график платежей в XLSX",
+            "GET",
+            "/applications/{{applicationId}}/contract/schedule-export",
+            token="clientToken",
+            query={"format": "xlsx"},
+            tests=[
+                "pm.test('XLSX', () => pm.expect(pm.response.headers.get('Content-Type'))"
+                ".to.include('spreadsheetml'));"
+            ],
+        ),
+        request(
             "Клиент: уведомления",
             "GET",
             "/notifications",

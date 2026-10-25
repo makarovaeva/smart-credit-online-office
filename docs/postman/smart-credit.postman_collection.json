@@ -989,6 +989,87 @@
           "id": "abf245e2-ce51-5519-8f5f-5c73a1fc1ddf"
         },
         {
+          "name": "Клиент: договор в PDF",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{clientToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/applications/{{applicationId}}/contract/document",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "applications",
+                "{{applicationId}}",
+                "contract",
+                "document"
+              ]
+            },
+            "description": "Кредитный договор с графиком платежей (демонстрационный документ)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('PDF', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf'));"
+                ]
+              }
+            }
+          ],
+          "id": "3e97f8eb-b7f7-54ab-b9f3-5d3e384ee7f3"
+        },
+        {
+          "name": "Клиент: график платежей в XLSX",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{clientToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/applications/{{applicationId}}/contract/schedule-export?format=xlsx",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "applications",
+                "{{applicationId}}",
+                "contract",
+                "schedule-export"
+              ],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "xlsx"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('XLSX', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('spreadsheetml'));"
+                ]
+              }
+            }
+          ],
+          "id": "16c9c47b-ee49-5a7d-86cb-87adde910fc4"
+        },
+        {
           "name": "Клиент: уведомления",
           "request": {
             "method": "GET",

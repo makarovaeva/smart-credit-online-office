@@ -112,8 +112,10 @@ try {
   await wait("document.querySelectorAll('table tbody tr').length === 24");
   console.log("Offer acceptance, signing, disbursement and actual payment schedule verified");
   await navigate("/documents");
-  await wait("document.body.innerText.includes('Документов нет')");
-  console.log("Documents list loaded from API (no files for this application)");
+  await wait("document.body.innerText.includes('Кредитный договор №')");
+  const exports = await evaluate(`Promise.all(Array.from(document.querySelectorAll('a[href*="/contract/"]')).map(a => fetch(a.href).then(async r => [r.status, r.headers.get('content-type'), (await r.arrayBuffer()).byteLength])))`);
+  if (exports.length !== 2 || exports.some(([status, type, size]) => status !== 200 || size < 1000 || !/pdf|spreadsheet/.test(type))) throw new Error(`Contract exports failed: ${JSON.stringify(exports)}`);
+  console.log("Documents show contract PDF and schedule XLSX downloads from API");
   await navigate("/profile");
   await wait("['7701000001', 'Генеральный директор', 'АО «Альфа-Банк»', 'finance@7701000001.example'].every(t => document.body.innerText.includes(t)) && !document.body.innerText.includes('[ФИО]')");
   console.log("Company profile shows registry, head, contacts and settlement account from API");

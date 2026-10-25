@@ -201,6 +201,19 @@ export function bindBank(html: string, name: string, bank: BankState & { draft: 
     const tbody = doc.querySelector("table tbody");
     if (tbody) {
       tbody.replaceChildren();
+      // Договор и график из выгрузок backend - первыми строками
+      if (bank.contract?.application_id) {
+        const contractApp = str(bank.contract.application_id);
+        const rows: [string, unknown, string, string][] = [
+          [`Кредитный договор №${str(bank.contract.contract_number)}`, bank.contract.signed_at ?? bank.contract.created_at, bank.contract.signed_at ? "Подписан" : "Проект", "document"],
+          ["График платежей (XLSX)", bank.contract.signed_at ?? bank.contract.created_at, "Действует", "schedule-export?format=xlsx"],
+        ];
+        for (const [title, when, state, path] of rows) {
+          const tr = doc.createElement("tr"); tr.style.borderTop = "1px solid #eceef0";
+          for (const value of [title, date(when), state]) { const td = doc.createElement("td"); td.style.padding = "16px 8px"; td.textContent = str(value); tr.append(td); }
+          const td = doc.createElement("td"); const link = doc.createElement("a"); link.className = "bs"; link.textContent = "Скачать"; link.href = `/api/backend/applications/${contractApp}/contract/${path}`; link.download = ""; td.append(link); tr.append(td); tbody.append(tr);
+        }
+      }
       for (const file of bank.documents) {
         const tr = doc.createElement("tr"); tr.style.borderTop = "1px solid #eceef0";
         for (const value of [file.file_name, date(file.created_at), "Загружен"]) { const td = doc.createElement("td"); td.style.padding = "16px 8px"; td.textContent = str(value); tr.append(td); }

@@ -1,12 +1,13 @@
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 from app.api.deps import (
     AUTH_RESPONSES,
     CONFLICT,
+    EXPORT_RESPONSES,
     NOT_FOUND,
     CurrentAnalyst,
     CurrentEmployee,
@@ -14,6 +15,7 @@ from app.api.deps import (
     Limit,
     Offset,
     SessionDep,
+    download,
     file_response,
 )
 from app.models.enums import ApplicationStatus, RiskZone
@@ -33,7 +35,15 @@ from app.schemas.decision import (
 )
 from app.schemas.document import InfoRequestCreate, InfoRequestRead
 from app.schemas.loan import LoanContractRead
-from app.services import backoffice, decisions, documents, internal_requests, loans, offers
+from app.services import (
+    backoffice,
+    decisions,
+    documents,
+    exports,
+    internal_requests,
+    loans,
+    offers,
+)
 from app.services.offers import to_decision_read
 
 router = APIRouter(
@@ -219,6 +229,33 @@ async def download_document(
         session, employee, application_id, document_id
     )
     return file_response(document, path)
+
+
+@router.get(
+    "/{application_id}/contract/document", response_class=Response, responses=EXPORT_RESPONSES
+)
+async def download_contract(
+    application_id: uuid.UUID, employee: CurrentEmployee, session: SessionDep
+) -> Response:
+    """Кредитный договор с графиком в PDF по своей заявке."""
+    application = await backoffice.get_visible_application(session, employee, application_id)
+    return download(*await exports.export(session, application, "contract", "pdf"))
+
+
+@router.get(
+    "/{application_id}/contract/schedule-export",
+    response_class=Response,
+    responses=EXPORT_RESPONSES,
+)
+async def download_schedule(
+    application_id: uuid.UUID,
+    employee: CurrentEmployee,
+    session: SessionDep,
+    format: Literal["pdf", "xlsx"] = "xlsx",
+) -> Response:
+    """График платежей по договору своей заявки: XLSX или PDF."""
+    application = await backoffice.get_visible_application(session, employee, application_id)
+    return download(*await exports.export(session, application, "schedule", format))
 
 
 @router.post("/{application_id}/contract", responses=CONFLICT)
