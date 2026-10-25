@@ -42,9 +42,12 @@ annotated-types 0.8.0 — MIT — https://github.com/annotated-types/annotated-t
 anyio 4.15.1 — MIT — https://github.com/agronholm/anyio
 asyncpg 0.32.0 — Apache-2.0 — https://github.com/MagicStack/asyncpg
 click 8.5.0 — BSD-3-Clause — https://github.com/pallets/click/
+defusedxml 0.7.1 — PSF-2.0 — https://github.com/tiran/defusedxml
 dnspython 2.9.0 — ISC — https://www.dnspython.org
 email-validator 2.3.0 — Unlicense — https://github.com/JoshData/python-email-validator
 fastapi 0.156.1 — MIT — https://github.com/fastapi/fastapi
+fonttools 4.67.0 — MIT — https://github.com/fonttools/fonttools
+fpdf2 2.8.9 — LGPL-3.0-only — https://github.com/py-pdf/fpdf2 (используется без изменений, как библиотека)
 greenlet 3.5.6 — MIT AND PSF-2.0 — https://greenlet.readthedocs.io
 h11 0.16.0 — MIT — https://github.com/python-hyper/h11
 httptools 0.9.0 — MIT — https://github.com/MagicStack/httptools
@@ -52,16 +55,17 @@ idna 3.20 — BSD-3-Clause — https://github.com/kjd/idna
 Mako 1.4.3 — MIT — https://www.makotemplates.org/
 MarkupSafe 3.0.4 — BSD-3-Clause — https://github.com/pallets/markupsafe/
 opentelemetry-api 1.45.1 — Apache-2.0 — https://github.com/open-telemetry/opentelemetry-python/tree/main/opentelemetry-api
+pillow 13.0.0 — MIT-CMU — https://python-pillow.org
 pydantic 2.14.1 — MIT — https://github.com/pydantic/pydantic
-pydantic_core 2.50.1 — MIT — https://github.com/pydantic
 pydantic-settings 2.16.1 — MIT — https://github.com/pydantic/pydantic-settings
+pydantic_core 2.50.1 — MIT — https://github.com/pydantic
 python-dotenv 1.2.4 — BSD-3-Clause — https://github.com/theskumar/python-dotenv
 python-multipart 0.0.32 — Apache-2.0 — https://github.com/Kludex/python-multipart
 PyYAML 6.0.3 — MIT — https://github.com/yaml/pyyaml
 SQLAlchemy 2.1.5 — MIT — https://www.sqlalchemy.org
 starlette 1.9.0 — BSD-3-Clause — https://github.com/Kludex/starlette
-typing_extensions 4.16.0 — PSF-2.0 — https://github.com/python/typing_extensions
 typing-inspection 0.4.4 — MIT — https://github.com/pydantic/typing-inspection
+typing_extensions 4.16.0 — PSF-2.0 — https://github.com/python/typing_extensions
 uvicorn 0.54.0 — BSD-3-Clause — https://uvicorn.dev/
 uvloop 0.23.0 — Apache-2.0 OR MIT — https://github.com/MagicStack/uvloop
 watchfiles 1.3.0 — MIT — https://github.com/samuelcolvin/watchfiles
@@ -118,6 +122,12 @@ typing-inspection 0.4.4 — MIT — https://github.com/pydantic/typing-inspectio
 tzdata 2026.5 — Apache-2.0 — https://github.com/python/tzdata
 uvicorn 0.54.0 — BSD-3-Clause — https://uvicorn.dev/
 colorama 0.4.6 (только Windows) — BSD-3-Clause — https://github.com/tartley/colorama
+
+Шрифты для PDF-выгрузок (backend/app/assets/fonts)
+=================================================
+DejaVu Sans 2.37 (DejaVuSans.ttf, DejaVuSans-Bold.ttf) — Bitstream Vera Fonts License
+и Arev Fonts License, изменения DejaVu — public domain — https://dejavu-fonts.github.io
+Текст лицензии — backend/app/assets/fonts/LICENSE-DejaVu.
 
 Модель скоринга
 ===============

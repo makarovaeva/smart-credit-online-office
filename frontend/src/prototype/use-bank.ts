@@ -269,7 +269,14 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
         if (text === "Принять в работу" || text === "Вернуть с комментарием") transition("A_Analyst.dc.html");
       } else if (text === "Отправить") {
         throw new Error("Для этого действия ещё нет рабочего backend API. Запрос не отправлен.");
-      } else if (text === "Скачать" || text.includes("Скачать график") || text === "Кредитный договор") {
+      } else if (text === "Кредитный договор" || text.includes("Скачать график")) {
+        // Выгрузки backend: договор с графиком (PDF), график платежей (XLSX)
+        const contractApp = str(latest.current.contract?.application_id ?? latest.current.loans.find(loan => loan.application_id === id)?.application_id ?? latest.current.loans[0]?.application_id ?? "");
+        if (!contractApp) throw new Error("Договор ещё не подготовлен");
+        const link = document.createElement("a");
+        link.href = `/api/backend/applications/${contractApp}/contract/${text === "Кредитный договор" ? "document" : "schedule-export?format=xlsx"}`;
+        link.download = ""; document.body.append(link); link.click(); link.remove();
+      } else if (text === "Скачать") {
         throw new Error("Выберите документ в списке. Скачивание доступно только для файлов, возвращённых API.");
       } else handled = false;
     } catch (error) { setState(previous => ({ ...previous, error: error instanceof Error ? error.message : "Ошибка операции" })); }

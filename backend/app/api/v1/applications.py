@@ -1,17 +1,19 @@
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 from app.api.deps import (
     AUTH_RESPONSES,
     CONFLICT,
+    EXPORT_RESPONSES,
     NOT_FOUND,
     CurrentClient,
     Limit,
     Offset,
     SessionDep,
+    download,
     file_response,
 )
 from app.models.enums import ApplicationStatus, DocumentType
@@ -31,7 +33,7 @@ from app.schemas.decision import OfferRead, RejectOfferRequest
 from app.schemas.document import DocumentRead, InfoRequestAnswer, InfoRequestRead
 from app.schemas.loan import LoanContractRead
 from app.services import applications as service
-from app.services import documents, loans, offers
+from app.services import documents, exports, loans, offers
 
 router = APIRouter(
     prefix="/applications", tags=["applications"], responses=AUTH_RESPONSES | NOT_FOUND
@@ -299,6 +301,34 @@ async def sign_agreement(
     Код подтверждения не сверяется - в симуляции он показывается в интерфейсе."""
     application = await offers.sign_agreement(session, user, application_id)
     return await service.to_read(session, application)
+
+
+@router.get(
+    "/{application_id}/contract/document", response_class=Response, responses=EXPORT_RESPONSES
+)
+async def download_contract(
+    application_id: ApplicationId, user: CurrentClient, session: SessionDep
+) -> Response:
+    """Кредитный договор с графиком платежей в PDF (после принятия оффера; до подписания -
+    проект). Демонстрационный документ."""
+    application = await service.get_client_application(session, user, application_id)
+    return download(*await exports.export(session, application, "contract", "pdf"))
+
+
+@router.get(
+    "/{application_id}/contract/schedule-export",
+    response_class=Response,
+    responses=EXPORT_RESPONSES,
+)
+async def download_schedule(
+    application_id: ApplicationId,
+    user: CurrentClient,
+    session: SessionDep,
+    format: Literal["pdf", "xlsx"] = "xlsx",
+) -> Response:
+    """График платежей по договору: XLSX (числа, даты, итоги формулами) или PDF."""
+    application = await service.get_client_application(session, user, application_id)
+    return download(*await exports.export(session, application, "schedule", format))
 
 
 @router.get("/{application_id}/contract")

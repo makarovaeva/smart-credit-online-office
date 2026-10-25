@@ -79,6 +79,8 @@ cd backend && uv run python -m scripts.export_openapi
 | POST | `/applications/{id}/offer/accept`, `/reject` | Принять / отказаться от оффера |
 | POST | `/applications/{id}/sign` | Подписание и выдача (симуляция): `e_sign → disbursement → completed` |
 | GET | `/applications/{id}/contract` | Кредитный договор и график платежей (после принятия оффера) |
+| GET | `/applications/{id}/contract/document` | Договор с графиком в PDF (до подписания — проект; документ демонстрационный) |
+| GET | `/applications/{id}/contract/schedule-export?format=xlsx\|pdf` | График платежей: XLSX (числа, даты, итоги формулами) или PDF |
 | GET/POST | `/chat/messages` | Диалог с ИИ-агентом (`company_id`, необязательный `application_id`). POST возвращает пару: сообщение клиента и ответ агента. Если из текста разобраны параметры кредита — `confirmation_card` с суммой, сроком, целью, залогом и продуктом. Ещё агент отвечает о статусе, документах, оффере, отказе и продуктах. `client_message_id` защищает от дублей, `generated_by`: `rules` или `llm:<модель>`. Агент сам пишет о дозапросе, оффере, отказе, договоре и зачислении |
 | GET | `/loans`, `/loans/{id}` | Раздел «Кредиты»: договоры с остатком долга, ближайшим платежом и графиком |
 | GET | `/notifications` | Уведомления в кабинете, новые первыми; `unread` — счётчик непрочитанных, `unread_only` — фильтр |
@@ -98,6 +100,7 @@ cd backend && uv run python -m scripts.export_openapi
 | POST | `/backoffice/applications/{id}/internal-requests/{rid}/accept`, `/return` | аналитик (исполнитель) | Запрос экспертизы андеррайтера: принять в работу / вернуть с комментарием (`→ underwriter_review`) |
 | POST | `/backoffice/applications/{id}/internal-requests/{rid}/cancel`, `/remind` | андеррайтер (автор) | Отозвать запрос экспертизы (`→ underwriter_review`) / напомнить аналитику |
 | POST | `/backoffice/applications/{id}/info-requests/{rid}/cancel`, `/remind` | инициатор дозапроса | Отозвать дозапрос клиенту (возврат заявки к инициатору) / напомнить клиенту через ИИ-агента |
+| GET | `/backoffice/applications/{id}/contract/document`, `/contract/schedule-export` | аналитик, андеррайтер, админ | Те же выгрузки по своей заявке |
 | POST | `/backoffice/applications/{id}/contract` | аналитик (исполнитель) | Подготовка договора: `contract_generation → e_sign`. Нужна при `CONTRACT_PREPARATION=analyst`, в режиме `auto` договор готовится сам |
 | POST | `/backoffice/applications/{id}/decision` | андеррайтер | Одно из 4 решений. `more_information_required` с `more_info_target`: `client` — дозапрос документов, `credit_analyst` — запрос экспертизы. `conditional_approval` с `alternative_offer` берёт условия варианта из AI Credit Memo |
 
