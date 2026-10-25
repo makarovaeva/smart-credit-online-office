@@ -13,9 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import hash_password
 from app.db.session import SessionFactory
-from app.models import Company, CompanyMember, CompanyOwner, CreditProduct, User
+from app.models import CompanyMember, CreditProduct, User
 from app.models.enums import CompanyMemberRole, CreditFormat, LoanPurpose, UserRole
-from app.services.companies import lookup_requisites
+from app.services.companies import sync_company
 
 # Общий пароль демо-сотрудников - в README
 EMPLOYEE_PASSWORD = "demo-password"
@@ -35,6 +35,7 @@ CLIENTS = [
     ("+79990000003", "Дмитрий Кузнецов", "7701000002"),  # недействующая компания: автоотказ
     ("+79990000004", "Андрей Попов", "7701000007"),  # бизнесу 7 месяцев: к аналитику
     ("+79990000005", "Михаил Соколов", "770100000001"),  # ИП
+    ("+79990000006", "Ольга Морозова", "7701000019"),  # счёт в другом банке: запрос выписки
 ]
 
 PRODUCTS = [
@@ -106,24 +107,8 @@ async def _upsert(session: AsyncSession, model, key: str, values: dict):
 
 
 async def _company(session: AsyncSession, inn: str, owner: User) -> None:
-    requisites = await lookup_requisites(inn)
-    company = await _upsert(
-        session,
-        Company,
-        "inn",
-        {
-            "inn": inn,
-            "ogrn": requisites.ogrn,
-            "kpp": requisites.kpp,
-            "legal_form": requisites.legal_form,
-            "name": requisites.name,
-            "okved_main": requisites.okved_main,
-            "registration_date": requisites.registration_date,
-            "region": requisites.region,
-            "legal_address": requisites.legal_address or requisites.region,
-            "employees_count": requisites.employees_count,
-        },
-    )
+    """Компания и снимок реестра (обновляется при каждом запуске), владелец - демо-клиент."""
+    company = await sync_company(session, inn)
     member = await session.scalar(
         select(CompanyMember).where(
             CompanyMember.company_id == company.id, CompanyMember.user_id == owner.id
@@ -133,20 +118,6 @@ async def _company(session: AsyncSession, inn: str, owner: User) -> None:
         session.add(
             CompanyMember(company_id=company.id, user_id=owner.id, role=CompanyMemberRole.OWNER)
         )
-    has_owners = await session.scalar(
-        select(CompanyOwner.id).where(CompanyOwner.company_id == company.id).limit(1)
-    )
-    if not has_owners:
-        for registry_owner in requisites.owners:
-            session.add(
-                CompanyOwner(
-                    company_id=company.id,
-                    full_name=registry_owner.full_name,
-                    inn=registry_owner.inn,
-                    share_percent=registry_owner.share_percent,
-                    is_beneficiary=registry_owner.is_beneficiary,
-                )
-            )
 
 
 async def seed(session: AsyncSession) -> None:

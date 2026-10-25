@@ -1,18 +1,20 @@
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, Response
 
 from app.api.deps import (
     AUTH_RESPONSES,
     CONFLICT,
+    EXPORT_RESPONSES,
     NOT_FOUND,
     CurrentClient,
     Limit,
     Offset,
     SessionDep,
-    not_implemented,
+    download,
+    file_response,
 )
 from app.models.enums import ApplicationStatus, DocumentType
 from app.schemas.application import (
@@ -31,7 +33,7 @@ from app.schemas.decision import OfferRead, RejectOfferRequest
 from app.schemas.document import DocumentRead, InfoRequestAnswer, InfoRequestRead
 from app.schemas.loan import LoanContractRead
 from app.services import applications as service
-from app.services import loans, offers
+from app.services import documents, exports, loans, offers
 
 router = APIRouter(
     prefix="/applications", tags=["applications"], responses=AUTH_RESPONSES | NOT_FOUND
@@ -40,11 +42,12 @@ router = APIRouter(
 ApplicationId = uuid.UUID
 
 
-@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED, responses=CONFLICT)
 async def create_application(
     body: ApplicationCreate, user: CurrentClient, session: SessionDep
 ) -> ApplicationRead:
-    """Создать черновик заявки."""
+    """Создать черновик заявки. У компании одна заявка в работе: пока есть незавершённая
+    (не completed и не closed) - 409."""
     application = await service.create_application(session, user, body)
     return await service.to_read(session, application)
 
@@ -131,6 +134,17 @@ async def decline_pre_approval(
     return await service.to_read(session, application)
 
 
+@router.post("/{application_id}/cancel", responses=CONFLICT)
+async def cancel_application(
+    application_id: ApplicationId, user: CurrentClient, session: SessionDep
+) -> ApplicationRead:
+    """Отменить заявку до решения банка (draft ... underwriter_review): -> closed,
+    close_reason = client_cancelled; открытые дозапросы закрываются. У компании может быть
+    только одна заявка в работе - отмена позволяет подать новую."""
+    application = await service.cancel_application(session, user, application_id)
+    return await service.to_read(session, application)
+
+
 @router.post("/{application_id}/submit", responses=CONFLICT)
 async def submit_application(
     application_id: ApplicationId, user: CurrentClient, session: SessionDep
@@ -157,27 +171,44 @@ async def get_history(
 async def upload_document(
     application_id: ApplicationId,
     user: CurrentClient,
+    session: SessionDep,
     file: Annotated[UploadFile, File()],
     type: Annotated[DocumentType, Form()],
     info_request_id: Annotated[uuid.UUID | None, Form()] = None,
 ) -> DocumentRead:
-    not_implemented()
+    """Загрузить документ: до подачи (draft, pre_approved) или по дозапросу
+    (need_additional_data, можно указать info_request_id). Форматы: PDF, PNG, JPEG, XLSX, XLS,
+    DOCX, CSV; содержимое должно соответствовать расширению; размер - до
+    DOCUMENT_MAX_SIZE_MB (20 МБ)."""
+    document = await documents.upload_document(
+        session, user, application_id, file, type, info_request_id
+    )
+    return DocumentRead.model_validate(document)
 
 
 @router.get("/{application_id}/documents")
-async def list_documents(application_id: ApplicationId, user: CurrentClient) -> list[DocumentRead]:
-    not_implemented()
+async def list_documents(
+    application_id: ApplicationId, user: CurrentClient, session: SessionDep
+) -> list[DocumentRead]:
+    return [
+        DocumentRead.model_validate(d)
+        for d in await documents.list_documents(session, user, application_id)
+    ]
 
 
 @router.get(
     "/{application_id}/documents/{document_id}/content",
-    response_class=StreamingResponse,
+    response_class=FileResponse,
     responses={200: {"content": {"application/octet-stream": {}}}},
 )
 async def download_document(
-    application_id: ApplicationId, document_id: uuid.UUID, user: CurrentClient
-) -> StreamingResponse:
-    not_implemented()
+    application_id: ApplicationId,
+    document_id: uuid.UUID,
+    user: CurrentClient,
+    session: SessionDep,
+) -> FileResponse:
+    document, path = await documents.get_client_document(session, user, application_id, document_id)
+    return file_response(document, path)
 
 
 @router.delete(
@@ -186,9 +217,13 @@ async def download_document(
     responses=CONFLICT,
 )
 async def delete_document(
-    application_id: ApplicationId, document_id: uuid.UUID, user: CurrentClient
+    application_id: ApplicationId,
+    document_id: uuid.UUID,
+    user: CurrentClient,
+    session: SessionDep,
 ) -> None:
-    not_implemented()
+    """Удалить документ, который банк ещё не проверил, - только на этапах загрузки."""
+    await documents.delete_document(session, user, application_id, document_id)
 
 
 # --- Дозапросы ---
@@ -196,9 +231,13 @@ async def delete_document(
 
 @router.get("/{application_id}/info-requests")
 async def list_info_requests(
-    application_id: ApplicationId, user: CurrentClient
+    application_id: ApplicationId, user: CurrentClient, session: SessionDep
 ) -> list[InfoRequestRead]:
-    not_implemented()
+    """Дозапросы банка: от ИИ (комплект документов), аналитика или андеррайтера."""
+    return [
+        InfoRequestRead.model_validate(r)
+        for r in await documents.list_info_requests(session, user, application_id)
+    ]
 
 
 @router.post("/{application_id}/info-requests/{info_request_id}/answer", responses=CONFLICT)
@@ -207,11 +246,17 @@ async def answer_info_request(
     info_request_id: uuid.UUID,
     body: InfoRequestAnswer,
     user: CurrentClient,
+    session: SessionDep,
 ) -> InfoRequestRead:
-    """Ответить на дозапрос. Когда закрыты все открытые дозапросы:
-    дозапрос ИИ - need_additional_data -> ai_verification (повторная проверка комплекта),
-    дозапрос андеррайтера - need_additional_data -> underwriter_review."""
-    not_implemented()
+    """Ответить на дозапрос: сначала загрузить запрошенные документы (по файлу каждого типа),
+    без запрошенных документов нужен текст ответа. Когда закрыты все открытые дозапросы,
+    заявка возвращается к инициатору: ИИ - need_additional_data -> ai_verification
+    (повторная проверка комплекта, конвейер продолжается), аналитик -> analyst_escalation,
+    андеррайтер -> underwriter_review."""
+    request = await documents.answer_info_request(
+        session, user, application_id, info_request_id, body
+    )
+    return InfoRequestRead.model_validate(request)
 
 
 # --- Оффер и выдача ---
@@ -256,6 +301,34 @@ async def sign_agreement(
     Код подтверждения не сверяется - в симуляции он показывается в интерфейсе."""
     application = await offers.sign_agreement(session, user, application_id)
     return await service.to_read(session, application)
+
+
+@router.get(
+    "/{application_id}/contract/document", response_class=Response, responses=EXPORT_RESPONSES
+)
+async def download_contract(
+    application_id: ApplicationId, user: CurrentClient, session: SessionDep
+) -> Response:
+    """Кредитный договор с графиком платежей в PDF (после принятия оффера; до подписания -
+    проект). Демонстрационный документ."""
+    application = await service.get_client_application(session, user, application_id)
+    return download(*await exports.export(session, application, "contract", "pdf"))
+
+
+@router.get(
+    "/{application_id}/contract/schedule-export",
+    response_class=Response,
+    responses=EXPORT_RESPONSES,
+)
+async def download_schedule(
+    application_id: ApplicationId,
+    user: CurrentClient,
+    session: SessionDep,
+    format: Literal["pdf", "xlsx"] = "xlsx",
+) -> Response:
+    """График платежей по договору: XLSX (числа, даты, итоги формулами) или PDF."""
+    application = await service.get_client_application(session, user, application_id)
+    return download(*await exports.export(session, application, "schedule", format))
 
 
 @router.get("/{application_id}/contract")

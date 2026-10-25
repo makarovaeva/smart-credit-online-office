@@ -8,7 +8,8 @@ from httpx import AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import LoanContract, PaymentScheduleItem, User
+from app.core.config import get_settings
+from app.models import Application, LoanContract, PaymentScheduleItem, User
 from app.services import loans
 from tests.conftest import auth
 from tests.test_applications_api import at_underwriter
@@ -174,3 +175,37 @@ async def test_failed_disbursement_can_be_retried(
 
 def test_schedule_amounts_match_offer_payment() -> None:
     assert loans.annuity_payment(Decimal("3000000"), 36, Decimal("18")) == Decimal("108457.19")
+
+
+async def test_contract_prepared_by_analyst(
+    api: AsyncClient,
+    session: AsyncSession,
+    client_user: User,
+    analyst: User,
+    underwriter: User,
+    approved: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CONTRACT_PREPARATION=analyst: договор готовит назначенный кредитный аналитик."""
+    monkeypatch.setattr(get_settings(), "contract_preparation", "analyst")
+    url = f"/api/v1/applications/{approved}"
+    accepted = await api.post(f"{url}/offer/accept", headers=auth(client_user))
+    assert accepted.json()["status"] == "contract_generation"
+    assert accepted.json()["client_status"] == "approved"
+    assert (await api.get(f"{url}/contract", headers=auth(client_user))).status_code == 404
+    assert (await session.get(Application, approved)).assignee_id == analyst.id
+
+    prepare = f"/api/v1/backoffice/applications/{approved}/contract"
+    assert (await api.post(prepare, headers=auth(underwriter))).status_code == 403
+    response = await api.post(prepare, headers=auth(analyst))
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "awaiting_signature"
+
+    again = await api.post(prepare, headers=auth(analyst))
+    assert again.json()["id"] == response.json()["id"]
+    assert await contracts_count(session) == 1
+
+    application = (await api.get(url, headers=auth(client_user))).json()
+    assert application["status"] == "e_sign"
+    signed = await api.post(f"{url}/sign", json=SIGN, headers=auth(client_user))
+    assert signed.json()["status"] == "completed"

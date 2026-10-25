@@ -1,11 +1,13 @@
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, status
+from fastapi.responses import FileResponse, Response
 
 from app.api.deps import (
     AUTH_RESPONSES,
     CONFLICT,
+    EXPORT_RESPONSES,
     NOT_FOUND,
     CurrentAnalyst,
     CurrentEmployee,
@@ -13,12 +15,16 @@ from app.api.deps import (
     Limit,
     Offset,
     SessionDep,
+    download,
+    file_response,
 )
 from app.models.enums import ApplicationStatus, RiskZone
 from app.schemas.backoffice import (
     AssignRequest,
     BackofficeApplicationDetail,
     BackofficeApplicationItem,
+    InternalRequestRead,
+    ReturnRequestBody,
 )
 from app.schemas.common import Page
 from app.schemas.decision import (
@@ -27,7 +33,17 @@ from app.schemas.decision import (
     DecisionRead,
     UnderwriterDecisionRequest,
 )
-from app.services import backoffice, decisions
+from app.schemas.document import InfoRequestCreate, InfoRequestRead
+from app.schemas.loan import LoanContractRead
+from app.services import (
+    backoffice,
+    decisions,
+    documents,
+    exports,
+    internal_requests,
+    loans,
+    offers,
+)
 from app.services.offers import to_decision_read
 
 router = APIRouter(
@@ -98,3 +114,156 @@ async def make_decision(
     declined -> closed."""
     decision = await decisions.make_decision(session, underwriter, application_id, body)
     return to_decision_read(decision)
+
+
+@router.post(
+    "/{application_id}/info-requests", status_code=status.HTTP_201_CREATED, responses=CONFLICT
+)
+async def request_documents(
+    application_id: uuid.UUID, body: InfoRequestCreate, analyst: CurrentAnalyst, session: SessionDep
+) -> InfoRequestRead:
+    """Аналитик запрашивает документы у клиента через ИИ-агента:
+    analyst_escalation -> need_additional_data. Когда клиент ответит, заявка вернётся
+    к аналитику (analyst_escalation). Андеррайтер запрашивает документы решением
+    more_information_required."""
+    request = await documents.request_documents_by_analyst(session, analyst, application_id, body)
+    return InfoRequestRead.model_validate(request)
+
+
+# --- Запрос экспертизы андеррайтера у аналитика ---
+
+RequestId = uuid.UUID
+
+
+@router.post("/{application_id}/internal-requests/{request_id}/accept", responses=CONFLICT)
+async def accept_expertise_request(
+    application_id: uuid.UUID, request_id: RequestId, analyst: CurrentAnalyst, session: SessionDep
+) -> InternalRequestRead:
+    """Аналитик принимает запрос экспертизы в работу (open -> accepted). Закрывает его
+    заключение (analyst-conclusion) или возврат андеррайтеру."""
+    request = await internal_requests.accept(session, analyst, application_id, request_id)
+    return InternalRequestRead.model_validate(request)
+
+
+@router.post("/{application_id}/internal-requests/{request_id}/return", responses=CONFLICT)
+async def return_expertise_request(
+    application_id: uuid.UUID,
+    request_id: RequestId,
+    body: ReturnRequestBody,
+    analyst: CurrentAnalyst,
+    session: SessionDep,
+) -> InternalRequestRead:
+    """Вернуть запрос андеррайтеру с комментарием, без заключения:
+    analyst_escalation -> underwriter_review, андеррайтер получает уведомление."""
+    request = await internal_requests.return_request(
+        session, analyst, application_id, request_id, body.comment
+    )
+    return InternalRequestRead.model_validate(request)
+
+
+@router.post("/{application_id}/internal-requests/{request_id}/cancel", responses=CONFLICT)
+async def cancel_expertise_request(
+    application_id: uuid.UUID,
+    request_id: RequestId,
+    underwriter: CurrentUnderwriter,
+    session: SessionDep,
+) -> InternalRequestRead:
+    """Андеррайтер отзывает свой запрос экспертизы: analyst_escalation -> underwriter_review."""
+    request = await internal_requests.cancel_request(
+        session, underwriter, application_id, request_id
+    )
+    return InternalRequestRead.model_validate(request)
+
+
+@router.post("/{application_id}/internal-requests/{request_id}/remind", responses=CONFLICT)
+async def remind_analyst(
+    application_id: uuid.UUID,
+    request_id: RequestId,
+    underwriter: CurrentUnderwriter,
+    session: SessionDep,
+) -> InternalRequestRead:
+    """Напомнить аналитику о запросе экспертизы (уведомление в кабинете)."""
+    request = await internal_requests.remind_analyst(
+        session, underwriter, application_id, request_id
+    )
+    return InternalRequestRead.model_validate(request)
+
+
+# --- Дозапросы клиенту от сотрудников ---
+
+
+@router.post("/{application_id}/info-requests/{request_id}/cancel", responses=CONFLICT)
+async def cancel_info_request(
+    application_id: uuid.UUID, request_id: RequestId, employee: CurrentEmployee, session: SessionDep
+) -> InfoRequestRead:
+    """Отозвать свой дозапрос клиенту (аналитик или андеррайтер - инициатор). Если открытых
+    дозапросов не осталось, заявка возвращается к инициатору."""
+    request = await internal_requests.cancel_info_request(
+        session, employee, application_id, request_id
+    )
+    return InfoRequestRead.model_validate(request)
+
+
+@router.post("/{application_id}/info-requests/{request_id}/remind", responses=CONFLICT)
+async def remind_client(
+    application_id: uuid.UUID, request_id: RequestId, employee: CurrentEmployee, session: SessionDep
+) -> InfoRequestRead:
+    """Напомнить клиенту о дозапросе через ИИ-агента: сообщение в чате и уведомление."""
+    request = await internal_requests.remind_client(session, employee, application_id, request_id)
+    return InfoRequestRead.model_validate(request)
+
+
+@router.get(
+    "/{application_id}/documents/{document_id}/content",
+    response_class=FileResponse,
+    responses={200: {"content": {"application/octet-stream": {}}}},
+)
+async def download_document(
+    application_id: uuid.UUID,
+    document_id: uuid.UUID,
+    employee: CurrentEmployee,
+    session: SessionDep,
+) -> FileResponse:
+    """Скачать файл документа своей заявки (список - в карточке заявки)."""
+    document, path = await documents.get_employee_document(
+        session, employee, application_id, document_id
+    )
+    return file_response(document, path)
+
+
+@router.get(
+    "/{application_id}/contract/document", response_class=Response, responses=EXPORT_RESPONSES
+)
+async def download_contract(
+    application_id: uuid.UUID, employee: CurrentEmployee, session: SessionDep
+) -> Response:
+    """Кредитный договор с графиком в PDF по своей заявке."""
+    application = await backoffice.get_visible_application(session, employee, application_id)
+    return download(*await exports.export(session, application, "contract", "pdf"))
+
+
+@router.get(
+    "/{application_id}/contract/schedule-export",
+    response_class=Response,
+    responses=EXPORT_RESPONSES,
+)
+async def download_schedule(
+    application_id: uuid.UUID,
+    employee: CurrentEmployee,
+    session: SessionDep,
+    format: Literal["pdf", "xlsx"] = "xlsx",
+) -> Response:
+    """График платежей по договору своей заявки: XLSX или PDF."""
+    application = await backoffice.get_visible_application(session, employee, application_id)
+    return download(*await exports.export(session, application, "schedule", format))
+
+
+@router.post("/{application_id}/contract", responses=CONFLICT)
+async def prepare_contract(
+    application_id: uuid.UUID, analyst: CurrentAnalyst, session: SessionDep
+) -> LoanContractRead:
+    """Подготовка кредитного договора аналитиком после принятия оффера:
+    contract_generation -> e_sign. Нужна при CONTRACT_PREPARATION=analyst; в режиме auto
+    договор готовится сразу при принятии оффера. Повторный вызов возвращает тот же договор."""
+    contract = await offers.prepare_contract_by_analyst(session, analyst, application_id)
+    return await loans.to_contract_read(session, contract)

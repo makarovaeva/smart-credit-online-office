@@ -1,8 +1,9 @@
 import uuid
+from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from app.models.enums import RiskGrade, RiskZone
+from app.models.enums import InternalRequestStatus, RiskGrade, RiskZone
 from app.schemas.application import (
     ApplicationRead,
     ApplicationShort,
@@ -10,6 +11,7 @@ from app.schemas.application import (
     PreApprovalRead,
     StatusHistoryItem,
 )
+from app.schemas.common import ORMModel
 from app.schemas.company import CompanyOwnerRead, CompanyRead
 from app.schemas.decision import (
     CreditMemoRead,
@@ -27,6 +29,28 @@ class BackofficeApplicationItem(ApplicationShort):
     assignee_id: uuid.UUID | None
     risk_grade: RiskGrade | None
     risk_zone: RiskZone | None
+    expertise_request: InternalRequestStatus | None = Field(
+        default=None,
+        description="Активный запрос экспертизы андеррайтера (open / accepted): на вкладке "
+        "«Запросы от андеррайтера», без него эскалация - «Новые эскалации» от ИИ",
+    )
+
+
+class InternalRequestRead(ORMModel):
+    id: uuid.UUID
+    application_id: uuid.UUID
+    from_user_id: uuid.UUID
+    accepted_by_id: uuid.UUID | None
+    status: InternalRequestStatus
+    message: str
+    response_comment: str | None
+    created_at: datetime
+    accepted_at: datetime | None
+    closed_at: datetime | None
+
+
+class ReturnRequestBody(BaseModel):
+    comment: str = Field(min_length=1, max_length=2000)
 
 
 class BackofficeApplicationDetail(BaseModel):
@@ -44,6 +68,7 @@ class BackofficeApplicationDetail(BaseModel):
     decisions: list[DecisionRead]
     contract: LoanContractRead | None
     info_requests: list[InfoRequestRead]
+    internal_requests: list[InternalRequestRead]
     documents: list[DocumentRead]
     history: list[StatusHistoryItem]
 

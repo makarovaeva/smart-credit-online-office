@@ -12,41 +12,55 @@ UNDERWRITER = frozenset({ActorType.UNDERWRITER})
 TRANSITIONS: dict[tuple[ApplicationStatus, ApplicationStatus], frozenset[ActorType]] = {
     # Блок 01. Клиентский путь
     (S.DRAFT, S.DATA_COLLECTION): CLIENT,  # клиент дал согласия на получение данных
+    (S.DRAFT, S.CLOSED): CLIENT,  # отмена клиентом
     (S.DATA_COLLECTION, S.PRE_APPROVED): SYSTEM,
     (S.PRE_APPROVED, S.SUBMITTED): CLIENT,
     (S.PRE_APPROVED, S.CLOSED): CLIENT,  # отказ после предварительного расчёта
     # Блок 02. Анализ ИИ
+    # Порядок этапов по доске от 23.10: проверка -> скоринг -> маршрутизация -> (зелёная зона)
+    # финансовый анализ и AI Credit Memo -> андеррайтер
     (S.SUBMITTED, S.AI_VERIFICATION): SYSTEM,
-    (S.AI_VERIFICATION, S.AI_FINANCIAL_ANALYSIS): SYSTEM,
+    # Отмена клиентом до решения банка (допущение: на доске не определено, нужно, чтобы
+    # соблюдалось правило «одна заявка в работе на компанию»)
+    (S.SUBMITTED, S.CLOSED): CLIENT,
+    (S.NEED_ADDITIONAL_DATA, S.CLOSED): CLIENT,
+    (S.ANALYST_ESCALATION, S.CLOSED): CLIENT,
+    (S.AI_VERIFICATION, S.AI_RISK_SCORING): SYSTEM,
     (S.AI_VERIFICATION, S.NEED_ADDITIONAL_DATA): SYSTEM,
-    # Документы досланы: дозапрос ИИ - повторная проверка комплекта,
-    # дозапрос андеррайтера - сразу повторное рассмотрение
+    # Клиент ответил на дозапрос - заявка возвращается к инициатору: дозапрос ИИ - повторная
+    # проверка комплекта, аналитика - к аналитику, андеррайтера - сразу повторное рассмотрение
     (S.NEED_ADDITIONAL_DATA, S.AI_VERIFICATION): CLIENT,
-    (S.NEED_ADDITIONAL_DATA, S.UNDERWRITER_REVIEW): CLIENT,
-    (S.AI_FINANCIAL_ANALYSIS, S.AI_RISK_SCORING): SYSTEM,
+    # ...или инициатор отозвал дозапрос
+    (S.NEED_ADDITIONAL_DATA, S.ANALYST_ESCALATION): CLIENT | ANALYST,
+    (S.NEED_ADDITIONAL_DATA, S.UNDERWRITER_REVIEW): CLIENT | UNDERWRITER,
     (S.AI_RISK_SCORING, S.NEED_ADDITIONAL_DATA): SYSTEM,
     (S.AI_RISK_SCORING, S.DECISION_ROUTING): SYSTEM,
-    # Блок 03. Маршрутизация: зелёная зона - андеррайтеру, жёлтая - аналитику,
-    # красная (стоп-фактор) - автоотказ
-    (S.DECISION_ROUTING, S.UNDERWRITER_REVIEW): SYSTEM,
+    # Блок 03. Маршрутизация: зелёная зона - финансовый анализ и андеррайтер,
+    # жёлтая - аналитик, красная (стоп-фактор) - автоотказ
+    (S.DECISION_ROUTING, S.AI_FINANCIAL_ANALYSIS): SYSTEM,
     (S.DECISION_ROUTING, S.ANALYST_ESCALATION): SYSTEM,
     (S.DECISION_ROUTING, S.CLOSED): SYSTEM,
+    (S.AI_FINANCIAL_ANALYSIS, S.UNDERWRITER_REVIEW): SYSTEM,
     # Блок 04. Исключения
     (S.ANALYST_ESCALATION, S.ANALYST_COMPLETED): ANALYST,
+    (S.ANALYST_ESCALATION, S.NEED_ADDITIONAL_DATA): ANALYST,  # запрос документов через ИИ
+    # Запрос экспертизы андеррайтера: аналитик вернул его без заключения или андеррайтер отозвал
+    (S.ANALYST_ESCALATION, S.UNDERWRITER_REVIEW): ANALYST | UNDERWRITER,
     (S.ANALYST_COMPLETED, S.UNDERWRITER_REVIEW): SYSTEM,
     # Блок 05. Решения андеррайтера
     (S.UNDERWRITER_REVIEW, S.OFFER_GENERATED): UNDERWRITER,  # approved / conditional_approval
     # more_information_required: документы у клиента или экспертиза аналитика
     (S.UNDERWRITER_REVIEW, S.NEED_ADDITIONAL_DATA): UNDERWRITER,
     (S.UNDERWRITER_REVIEW, S.ANALYST_ESCALATION): UNDERWRITER,
-    (S.UNDERWRITER_REVIEW, S.CLOSED): UNDERWRITER,  # declined
+    (S.UNDERWRITER_REVIEW, S.CLOSED): UNDERWRITER | CLIENT,  # declined / отмена клиентом
     # Блок 06. Оффер
     (S.OFFER_GENERATED, S.OFFER_ACCEPTED): CLIENT,
     (S.OFFER_GENERATED, S.OFFER_REJECTED): CLIENT,
     (S.OFFER_REJECTED, S.CLOSED): SYSTEM,
     # Блок 07. Выдача (подписание и перечисление смоделированы)
     (S.OFFER_ACCEPTED, S.CONTRACT_GENERATION): SYSTEM,
-    (S.CONTRACT_GENERATION, S.E_SIGN): SYSTEM,
+    # Договор готовит система (CONTRACT_PREPARATION=auto) или кредитный аналитик
+    (S.CONTRACT_GENERATION, S.E_SIGN): SYSTEM | ANALYST,
     (S.E_SIGN, S.DISBURSEMENT): CLIENT,
     (S.DISBURSEMENT, S.COMPLETED): SYSTEM,
 }

@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -27,6 +28,22 @@ class Settings(BaseSettings):
     # Сервис инференса ML (ml/service); при недоступности скоринг откатывается на правила
     ml_service_url: str = "http://ml:8000"
     ml_timeout_seconds: float = 10.0
+
+    # Кто готовит договор после принятия оффера: auto - система сразу; analyst - кредитный
+    # аналитик командой POST /backoffice/applications/{id}/contract (как на доске от 23.10)
+    contract_preparation: Literal["auto", "analyst"] = "auto"
+
+    # LLM для формулировки ответов ИИ-агента в чате: OpenAI-совместимый API сервера с моделью
+    # с открытыми весами (Ollama, llama.cpp server, vLLM), например http://ollama:11434/v1.
+    # Не задан - ответы по шаблонам из данных заявки; при ошибке модели - тоже шаблоны
+    llm_base_url: str | None = None
+    llm_model: str = "qwen2.5:7b-instruct"
+    llm_api_key: str | None = None
+    llm_timeout_seconds: float = 30.0
+
+    # Файлы документов заявок; в docker-compose - отдельный том
+    document_storage_dir: str = "var/documents"
+    document_max_size_mb: int = 20
 
     # Срок действия оффера на доске не задан - открытый вопрос
     offer_validity_days: int = 30

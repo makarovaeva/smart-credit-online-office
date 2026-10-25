@@ -88,9 +88,9 @@ async def test_green_zone_goes_to_underwriter(
     assert [h["to_status"] for h in await history(api, client_user, app_id)][2:] == [
         "submitted",
         "ai_verification",
-        "ai_financial_analysis",
         "ai_risk_scoring",
         "decision_routing",
+        "ai_financial_analysis",
         "underwriter_review",
     ]
 
@@ -215,7 +215,15 @@ async def test_underwriter_picks_alternative_offer(
     product: CreditProduct,
 ) -> None:
     # Долговая нагрузка на запрошенных условиях выше 50%: пограничный риск
-    app_id = await start(api, session, client_user, product, "7701000018", amount="5000000.00")
+    app_id = await start(
+        api,
+        session,
+        client_user,
+        product,
+        "7701000018",
+        amount="5000000.00",
+        requested_term_months=24,
+    )
     pre = await latest(session, PreApproval, app_id)
     assert any(r["code"] == "alternative_longer_term" for r in pre.recommendations)
     assert pre.amount_max == Decimal("5000000")

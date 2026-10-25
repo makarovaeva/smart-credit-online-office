@@ -41,6 +41,7 @@ def request(
     *,
     token: str | None = None,
     body: dict[str, Any] | None = None,
+    form: list[dict[str, str]] | None = None,
     query: dict[str, str] | None = None,
     tests: list[str] | None = None,
     status: int = 200,
@@ -65,6 +66,9 @@ def request(
     }
     if description:
         item["request"]["description"] = description
+    if form is not None:
+        # multipart/form-data: Content-Type с boundary проставляет Postman
+        item["request"]["body"] = {"mode": "formdata", "formdata": form}
     if body is not None:
         item["request"]["body"] = {
             "mode": "raw",
@@ -86,6 +90,27 @@ def js_expect(expr: str, value: str) -> str:
     return f"pm.test('{expr} = {value}', () => pm.expect({expr}).to.eql({json.dumps(value)}));"
 
 
+def js_close_active(token: str) -> list[str]:
+    """Закрыть незавершённые заявки клиента с прошлых прогонов: у компании одна заявка в
+    работе. До решения - отмена, на этапе оффера - отказ от оффера."""
+    return f"""
+const base = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl');
+const auth = {{ Authorization: `Bearer ${{pm.collectionVariables.get('{token}')}}` }};
+pm.sendRequest({{ url: `${{base}}/applications?limit=100`, header: auth }}, (err, res) => {{
+  if (err || res.code !== 200) return;
+  for (const app of res.json().items) {{
+    if (['completed', 'closed'].includes(app.status)) continue;
+    const command = app.status === 'offer_generated' ? 'offer/reject' : 'cancel';
+    pm.sendRequest({{
+      url: `${{base}}/applications/${{app.id}}/${{command}}`, method: 'POST',
+      header: {{ ...auth, 'Content-Type': 'application/json' }},
+      body: {{ mode: 'raw', raw: '{{}}' }},
+    }}, () => {{}});
+  }}
+}});
+""".strip().splitlines()
+
+
 def client_start(prefix: str, phone: str, amount: str, term: int = 36) -> list[dict[str, Any]]:
     """Вход клиента, создание черновика, согласия и подача: общее начало сценариев."""
     token, app_id = f"{prefix}Token", f"{prefix}AppId"
@@ -102,7 +127,10 @@ def client_start(prefix: str, phone: str, amount: str, term: int = 36) -> list[d
             "GET",
             "/me",
             token=token,
-            tests=[js_set(f"{prefix}CompanyId", "pm.response.json().companies[0].company_id")],
+            tests=[
+                js_set(f"{prefix}CompanyId", "pm.response.json().companies[0].company_id"),
+                *js_close_active(token),
+            ],
         ),
         request(
             "Клиент: создать черновик заявки",
@@ -198,7 +226,51 @@ def build_collection() -> dict[str, Any]:
             "GET",
             "/me",
             token="clientToken",
-            tests=[js_set("companyId", "pm.response.json().companies[0].company_id")],
+            tests=[
+                js_set("companyId", "pm.response.json().companies[0].company_id"),
+                *js_close_active("clientToken"),
+            ],
+        ),
+        request(
+            "Клиент: профиль компании",
+            "GET",
+            "/companies/{{companyId}}",
+            token="clientToken",
+            description="Реквизиты, руководитель и владельцы из ЕГРЮЛ, контакты и расчётный счёт.",
+            tests=[
+                js_expect("pm.response.json().inn", "7701000001"),
+                "pm.test('есть руководитель и счёт', () => { const c = pm.response.json(); "
+                "pm.expect(c.head.full_name).to.be.a('string'); "
+                "pm.expect(c.settlement_account.account_number).to.match(/^40702810/); });",
+            ],
+        ),
+        request(
+            "Подбор продукта",
+            "POST",
+            "/products/match",
+            body={"purpose": "working_capital", "amount": "3000000", "term_months": 24},
+            description="Подходящие продукты первыми, с пояснениями и примерным платежом.",
+            tests=[
+                "pm.test('первый продукт подходит', () => pm.expect(pm.response.json()[0].fits)"
+                ".to.be.true);"
+            ],
+        ),
+        request(
+            "Клиент: ИИ-агенту - параметры кредита",
+            "POST",
+            "/chat/messages",
+            token="clientToken",
+            status=201,
+            body={
+                "company_id": "{{companyId}}",
+                "content": "Нужно 3 млн на 2 года на пополнение оборотных средств",
+            },
+            description="Агент разбирает сумму, срок и цель и возвращает карточку подтверждения "
+            "с подходящим продуктом. Заявку клиент создаёт обычными командами.",
+            tests=[
+                js_expect("pm.response.json().reply.message_type", "confirmation_card"),
+                js_expect("pm.response.json().reply.card_payload.fields.amount", "3000000.00"),
+            ],
         ),
         request(
             "Каталог продуктов",
@@ -348,6 +420,51 @@ def build_collection() -> dict[str, Any]:
             tests=[js_expect("pm.response.json().status", "completed")],
         ),
         request(
+            "Клиент: сообщения агента по заявке",
+            "GET",
+            "/chat/messages",
+            token="clientToken",
+            query={"company_id": "{{companyId}}", "application_id": "{{applicationId}}"},
+            description="Агент сам пишет о событиях: оффер, договор на подпись, зачисление.",
+            tests=[
+                "pm.test('есть сообщение о зачислении', () => pm.expect(pm.response.json()"
+                ".map(m => m.content).join(' ')).to.include('Средства зачислены'));"
+            ],
+        ),
+        request(
+            "Клиент: договор в PDF",
+            "GET",
+            "/applications/{{applicationId}}/contract/document",
+            token="clientToken",
+            description="Кредитный договор с графиком платежей (демонстрационный документ).",
+            tests=[
+                "pm.test('PDF', () => pm.expect(pm.response.headers.get('Content-Type'))"
+                ".to.include('application/pdf'));"
+            ],
+        ),
+        request(
+            "Клиент: график платежей в XLSX",
+            "GET",
+            "/applications/{{applicationId}}/contract/schedule-export",
+            token="clientToken",
+            query={"format": "xlsx"},
+            tests=[
+                "pm.test('XLSX', () => pm.expect(pm.response.headers.get('Content-Type'))"
+                ".to.include('spreadsheetml'));"
+            ],
+        ),
+        request(
+            "Клиент: уведомления",
+            "GET",
+            "/notifications",
+            token="clientToken",
+            description="Уведомления в кабинете о событиях заявки, счётчик непрочитанных.",
+            tests=[
+                "pm.test('есть уведомление о зачислении', () => pm.expect(pm.response.json()"
+                ".items.map(n => n.type)).to.include('funds_disbursed'));"
+            ],
+        ),
+        request(
             "Клиент: мои кредиты",
             "GET",
             "/loans",
@@ -367,7 +484,7 @@ def build_collection() -> dict[str, Any]:
     ]
 
     counter = [
-        *client_start("counter", "+7 999 000-00-02", "5000000.00"),
+        *client_start("counter", "+7 999 000-00-02", "5000000.00", term=24),
         employee_login(
             "Андеррайтер: вход", "counterUwToken", ("underwriter1", "underwriter2"), "counterAppId"
         ),
@@ -456,6 +573,82 @@ def build_collection() -> dict[str, Any]:
         ),
     ]
 
+    documents = client_start("docs", "+7 999 000-00-06", "3000000.00")
+    documents[-1]["event"][0]["script"]["exec"] += [
+        js_expect("pm.response.json().status", "need_additional_data"),
+        js_expect("pm.response.json().client_status", "documents_required"),
+    ]
+    documents += [
+        request(
+            "Клиент: дозапрос ИИ",
+            "GET",
+            "/applications/{{docsAppId}}/info-requests",
+            token="docsToken",
+            description="Счёт в другом банке - ИИ запрашивает выписку за 12 месяцев.",
+            tests=[
+                js_set("docsRequestId", "pm.response.json()[0].id"),
+                js_expect("pm.response.json()[0].requested_by", "system"),
+                js_expect("pm.response.json()[0].requested_document_types[0]", "bank_statement"),
+            ],
+        ),
+        request(
+            "Клиент: загрузить выписку",
+            "POST",
+            "/applications/{{docsAppId}}/documents",
+            token="docsToken",
+            status=201,
+            form=[
+                {"key": "file", "type": "file", "src": "files/vypiska.pdf"},
+                {"key": "type", "type": "text", "value": "bank_statement"},
+                {"key": "info_request_id", "type": "text", "value": "{{docsRequestId}}"},
+            ],
+            description="Файл - docs/postman/files/vypiska.pdf (в Postman выберите его вручную).",
+            tests=[
+                js_set("docsDocumentId", "pm.response.json().id"),
+                js_expect("pm.response.json().content_type", "application/pdf"),
+            ],
+        ),
+        request(
+            "Клиент: документы заявки",
+            "GET",
+            "/applications/{{docsAppId}}/documents",
+            token="docsToken",
+            tests=[
+                "pm.test('один документ', () => pm.expect(pm.response.json()).to.have.length(1));"
+            ],
+        ),
+        request(
+            "Клиент: ответить на дозапрос",
+            "POST",
+            "/applications/{{docsAppId}}/info-requests/{{docsRequestId}}/answer",
+            token="docsToken",
+            body={"message": "Выписка за 12 месяцев приложена"},
+            description="Все дозапросы закрыты - ИИ повторно проверяет комплект, конвейер "
+            "продолжается.",
+            tests=[js_expect("pm.response.json().status", "answered")],
+        ),
+        request(
+            "Клиент: заявка у андеррайтера",
+            "GET",
+            "/applications/{{docsAppId}}",
+            token="docsToken",
+            tests=[js_expect("pm.response.json().status", "underwriter_review")],
+        ),
+        employee_login(
+            "Андеррайтер: вход", "docsUwToken", ("underwriter1", "underwriter2"), "docsAppId"
+        ),
+        request(
+            "Андеррайтер: скачать выписку",
+            "GET",
+            "/backoffice/applications/{{docsAppId}}/documents/{{docsDocumentId}}/content",
+            token="docsUwToken",
+            tests=[
+                "pm.test('PDF', () => pm.expect(pm.response.headers.get('Content-Type'))"
+                ".to.include('application/pdf'));"
+            ],
+        ),
+    ]
+
     errors = [
         request("401: без токена", "GET", "/applications", status=401),
         request(
@@ -480,11 +673,40 @@ def build_collection() -> dict[str, Any]:
             status=403,
         ),
         request(
+            "409: компания уже привязана",
+            "POST",
+            "/companies",
+            token="clientToken",
+            status=409,
+            body={"inn": "7701000001", "member_role": "owner"},
+        ),
+        request(
+            "404: чужая компания",
+            "GET",
+            "/companies/{{companyId}}",
+            token="counterToken",
+            status=404,
+        ),
+        request(
             "404: чужая заявка",
             "GET",
             "/applications/{{applicationId}}",
             token="counterToken",
             status=404,
+        ),
+        request(
+            "409: вторая заявка компании в работе",
+            "POST",
+            "/applications",
+            token="counterToken",
+            status=409,
+            body={
+                "company_id": "{{counterCompanyId}}",
+                "product_id": "{{productId}}",
+                "requested_amount": "1000000.00",
+                "requested_term_months": 24,
+                "purpose": "working_capital",
+            },
         ),
         request(
             "409: подпись до принятия оффера",
@@ -526,7 +748,8 @@ def build_collection() -> dict[str, Any]:
         ),
         folder(
             "2. Контр-предложение с вариантами",
-            "Клиент +7 999 000-00-02, 5 млн: пограничный риск, андеррайтер выбирает вариант.",
+            "Клиент +7 999 000-00-02, 5 млн на 24 мес.: пограничный риск по DSCR, андеррайтер "
+            "выбирает вариант.",
             counter,
         ),
         folder(
@@ -539,7 +762,13 @@ def build_collection() -> dict[str, Any]:
             "Клиент +7 999 000-00-04: бизнесу 7 месяцев, жёлтая зона, заключение аналитика.",
             escalation,
         ),
-        folder("5. Ошибки", "Коды ответов при ошибочных сценариях.", errors),
+        folder(
+            "5. Документы и дозапрос",
+            "Клиент +7 999 000-00-06: счёт в другом банке, ИИ запрашивает выписку, клиент "
+            "загружает её и отвечает, конвейер продолжается, андеррайтер скачивает файл.",
+            documents,
+        ),
+        folder("6. Ошибки", "Коды ответов при ошибочных сценариях.", errors),
     ]
     for f in folders:
         for item in f["item"]:

@@ -37,7 +37,15 @@ async function login(path, values, role) {
   await wait("document.querySelectorAll('table tbody tr').length > 0 || location.pathname === '/applications'");
   console.log(`UI login: ${role}`);
 }
+// У компании одна заявка в работе: закрываем незавершённые заявки прошлых прогонов
+async function closeActive() {
+  const rows = (await api("/api/backend/applications?limit=100")).data.items;
+  for (const app of rows.filter(a => !["completed", "closed"].includes(a.status))) {
+    await api(`/api/backend/applications/${app.id}/${app.status === "offer_generated" ? "offer/reject" : "cancel"}`, {});
+  }
+}
 async function fixture() {
+  await closeActive();
   const user = (await api("/api/session")).data;
   const products = (await api("/api/backend/products")).data;
   const product = products.find(p => !p.requires_collateral && p.purposes.includes("working_capital") && Number(p.max_amount) >= 3000000 && Number(p.min_term_months) <= 24 && Number(p.max_term_months) >= 24);
@@ -58,8 +66,13 @@ try {
     application = { id: previous.applicationId }; contract = { data: { id: previous.contractId } };
   } else {
   await login("/login", ["+7 999 000-00-01"], "client");
+  await closeActive();
   await navigate("/chat");
   await wait("document.body.innerText.includes('Подтвердить и отправить заявку')");
+  await evaluate("(() => { const input = document.querySelector('input[aria-label=\"Сообщение\"]'); input.focus(); input.value = '3 млн на 2 года на пополнение оборотных средств'; input.dispatchEvent(new Event('input', { bubbles: true })); })()");
+  await click("Отправить");
+  await wait("!!document.querySelector('[data-chat-message=confirmation_card]') && document.querySelector('[data-chat-message=confirmation_card]').innerText.includes('Оборотный кредит') && !document.querySelector('[aria-busy=true]')");
+  console.log("AI agent parsed loan parameters in chat and suggested a product");
   await click("Подтвердить и отправить заявку");
   await wait("location.pathname === '/applications' && !document.querySelector('[aria-busy=true]')");
   const applications = await api("/api/backend/applications?limit=1"); application = applications.data.items[0];
@@ -67,6 +80,8 @@ try {
   const created = await api(`/api/backend/applications/${application.id}`);
   if (created.data.status !== "underwriter_review") throw new Error(`Unexpected actual status: ${JSON.stringify(created.data)}`);
   console.log(`Created and submitted real application ${application.id}`);
+  const dialog = await api(`/api/backend/chat/messages?company_id=${created.data.company_id}`);
+  if (!dialog.data.some(m => m.message_type === "confirmation_card" && m.reply_to_id)) throw new Error("Chat exchange was not saved");
 
   let found = false;
   for (const number of [1, 2]) {
@@ -97,8 +112,13 @@ try {
   await wait("document.querySelectorAll('table tbody tr').length === 24");
   console.log("Offer acceptance, signing, disbursement and actual payment schedule verified");
   await navigate("/documents");
-  await wait("document.body.innerText.includes('Документы недоступны')");
-  console.log("Unimplemented documents are shown as unavailable, not simulated");
+  await wait("document.body.innerText.includes('Кредитный договор №')");
+  const exports = await evaluate(`Promise.all(Array.from(document.querySelectorAll('a[href*="/contract/"]')).map(a => fetch(a.href).then(async r => [r.status, r.headers.get('content-type'), (await r.arrayBuffer()).byteLength])))`);
+  if (exports.length !== 2 || exports.some(([status, type, size]) => status !== 200 || size < 1000 || !/pdf|spreadsheet/.test(type))) throw new Error(`Contract exports failed: ${JSON.stringify(exports)}`);
+  console.log("Documents show contract PDF and schedule XLSX downloads from API");
+  await navigate("/profile");
+  await wait("['7701000001', 'Генеральный директор', 'АО «Альфа-Банк»', 'finance@7701000001.example'].every(t => document.body.innerText.includes(t)) && !document.body.innerText.includes('[ФИО]')");
+  console.log("Company profile shows registry, head, contacts and settlement account from API");
   }
 
   await login("/login", ["+7 999 000-00-03"], "client");
@@ -118,9 +138,36 @@ try {
     if (queue.data.items.some(a => a.id === escalation.id)) { analystFound = true; break; }
   }
   if (!analystFound) throw new Error("Escalation absent from analyst queues");
-  await wait(`!!document.querySelector('[data-application-id="${escalation.id}"]')`);
-  await evaluate(`document.querySelector('[data-application-id="${escalation.id}"]').click()`);
-  await new Promise(r => setTimeout(r, 800));
+  const analystLogin = (await api("/api/session")).data.email;
+  const openEscalation = async () => {
+    await wait(`!!document.querySelector('[data-application-id="${escalation.id}"]')`);
+    await evaluate(`document.querySelector('[data-application-id="${escalation.id}"]').click()`);
+    await new Promise(r => setTimeout(r, 800));
+  };
+  await openEscalation();
+  await click("Запросить документы через ИИ-агента");
+  await wait("document.querySelector('[data-screen-name]')?.dataset.screenName === 'A_RequestDocs.dc.html'");
+  await evaluate("Array.from(document.querySelectorAll('label')).find(l => l.textContent.includes('Подтверждение оборота')).querySelector('input').click(); document.querySelector('textarea').value = 'Подтвердите обороты за последние 12 месяцев'");
+  await click("Передать ИИ-агенту");
+  await wait("document.querySelector('[data-screen-name]')?.dataset.screenName === 'A_Analyst.dc.html' && !document.querySelector('[aria-busy=true]')");
+  const requested = await api(`/api/backend/backoffice/applications/${escalation.id}`);
+  const docRequest = requested.data.info_requests.at(-1);
+  if (requested.data.application.status !== "need_additional_data" || docRequest?.requested_by !== "credit_analyst" || docRequest.requested_document_types[0] !== "bank_statement") throw new Error(`Analyst document request not persisted: ${JSON.stringify(requested.data.info_requests)}`);
+  console.log("Analyst document request sent to the client through UI");
+
+  await login("/login", ["+7 999 000-00-04"], "client");
+  const uploaded = await evaluate(`(() => { const data = new FormData(); data.append("file", new Blob(["%PDF-1.4\\n%%EOF\\n"], { type: "application/pdf" }), "vypiska.pdf"); data.append("type", "bank_statement"); data.append("info_request_id", ${JSON.stringify(docRequest.id)}); return fetch("/api/backend/applications/${escalation.id}/documents", { method: "POST", body: data }).then(r => r.status); })()`);
+  if (uploaded !== 201) throw new Error(`Document upload failed: ${uploaded}`);
+  const answered = await api(`/api/backend/applications/${escalation.id}/info-requests/${docRequest.id}/answer`, { message: "Выписка приложена" });
+  if (answered.status !== 200) throw new Error(`Info request answer failed: ${JSON.stringify(answered)}`);
+  if ((await api(`/api/backend/applications/${escalation.id}`)).data.status !== "analyst_escalation") throw new Error("Answered request did not return application to analyst");
+  console.log("Client uploaded the document and answered; application returned to analyst");
+
+  await login("/staff/login?role=analyst", [analystLogin, "demo-password"], "credit_analyst");
+  const files = (await api(`/api/backend/backoffice/applications/${escalation.id}`)).data.documents;
+  const download = await evaluate(`fetch("/api/backend/backoffice/applications/${escalation.id}/documents/${files[0]?.id}/content").then(r => r.status)`);
+  if (files.length !== 1 || download !== 200) throw new Error(`Analyst cannot download uploaded file: ${download}`);
+  await openEscalation();
   await click("Отправить заключение андеррайтеру");
   await wait("!!document.querySelector('textarea')");
   await evaluate("document.querySelector('textarea').value='Проверено на синтетических данных'; document.querySelector('input[type=radio]').click()");

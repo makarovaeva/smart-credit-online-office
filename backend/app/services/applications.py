@@ -4,17 +4,21 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
     Application,
     ApplicationConsent,
     ApplicationStatusHistory,
+    ChatMessage,
     CompanyMember,
     CreditDecision,
     CreditProduct,
+    InfoRequest,
+    InternalRequest,
     PreApproval,
+    ScoringResult,
     User,
 )
 from app.models.application import application_number_seq
@@ -24,7 +28,10 @@ from app.models.enums import (
     CloseReason,
     ConsentType,
     DecisionType,
+    InfoRequestStatus,
+    InternalRequestStatus,
     LoanPurpose,
+    StopFactorCode,
 )
 from app.schemas.application import (
     ApplicationAction,
@@ -32,9 +39,11 @@ from app.schemas.application import (
     ApplicationRead,
     ApplicationUpdate,
     ClientStatus,
+    DeclineReason,
 )
 from app.services import pipeline
 from app.services.client_status import client_status
+from app.services.credit_policy import STOP_FACTOR_ADVICE
 from app.services.errors import ConflictError, NotFoundError, ValidationFailedError
 from app.services.transitions import transition
 
@@ -42,9 +51,13 @@ S = ApplicationStatus
 A = ApplicationAction
 
 CLIENT_ACTIONS: dict[ApplicationStatus, list[ApplicationAction]] = {
-    S.DRAFT: [A.EDIT, A.GIVE_CONSENTS],
-    S.PRE_APPROVED: [A.EDIT, A.SUBMIT, A.DECLINE_PRE_APPROVAL],
-    S.NEED_ADDITIONAL_DATA: [A.EDIT, A.UPLOAD_DOCUMENTS, A.ANSWER_INFO_REQUEST],
+    S.DRAFT: [A.EDIT, A.GIVE_CONSENTS, A.UPLOAD_DOCUMENTS, A.CANCEL],
+    S.PRE_APPROVED: [A.EDIT, A.SUBMIT, A.DECLINE_PRE_APPROVAL, A.UPLOAD_DOCUMENTS, A.CANCEL],
+    # Конвейер упал - заявку можно отменить и подать заново
+    S.SUBMITTED: [A.CANCEL],
+    S.NEED_ADDITIONAL_DATA: [A.EDIT, A.UPLOAD_DOCUMENTS, A.ANSWER_INFO_REQUEST, A.CANCEL],
+    S.ANALYST_ESCALATION: [A.CANCEL],
+    S.UNDERWRITER_REVIEW: [A.CANCEL],
     S.OFFER_GENERATED: [A.ACCEPT_OFFER, A.REJECT_OFFER],
     S.E_SIGN: [A.SIGN],
     # Подписано, но выдача прервалась - повторный sign её доводит
@@ -86,7 +99,15 @@ _CLOSED_DESCRIPTIONS: dict[CloseReason, str] = {
     CloseReason.AUTO_DECLINED: "К сожалению, банк не готов предоставить финансирование",
     CloseReason.UNDERWRITER_DECLINED: "К сожалению, банк не готов предоставить финансирование",
     CloseReason.OFFER_REJECTED: "Заявка закрыта: вы не приняли предложение банка",
+    CloseReason.CLIENT_CANCELLED: "Заявка отменена по вашему запросу",
 }
+
+# Отмена клиентом - до решения банка; на этапе оффера - отказ от оффера
+CANCELLABLE = frozenset(
+    {S.DRAFT, S.PRE_APPROVED, S.SUBMITTED, S.NEED_ADDITIONAL_DATA, S.ANALYST_ESCALATION}
+    | {S.UNDERWRITER_REVIEW}
+)
+ACTIVE_STATUSES = frozenset(S) - {S.COMPLETED, S.CLOSED}
 
 
 def _status_description(application: Application, status: ClientStatus) -> str:
@@ -110,6 +131,37 @@ async def last_decision_type(
     )
 
 
+async def decline_reasons(session: AsyncSession, application: Application) -> list[DeclineReason]:
+    """Объяснение отказа клиенту: стоп-факторы с советом или причины андеррайтера."""
+    if application.close_reason == CloseReason.AUTO_DECLINED:
+        factors = await session.scalar(
+            select(ScoringResult.stop_factors)
+            .where(ScoringResult.application_id == application.id)
+            .order_by(ScoringResult.created_at.desc())
+            .limit(1)
+        )
+        return [
+            DeclineReason(
+                code=f["code"],
+                message=f["description"],
+                advice=STOP_FACTOR_ADVICE.get(StopFactorCode(f["code"])),
+            )
+            for f in factors or []
+        ]
+    if application.close_reason == CloseReason.UNDERWRITER_DECLINED:
+        reasons = await session.scalar(
+            select(CreditDecision.reasons)
+            .where(
+                CreditDecision.application_id == application.id,
+                CreditDecision.decision_type == DecisionType.DECLINED,
+            )
+            .order_by(CreditDecision.created_at.desc())
+            .limit(1)
+        )
+        return [DeclineReason(code=r["code"], message=r["message"]) for r in reasons or []]
+    return []
+
+
 async def to_read(session: AsyncSession, application: Application) -> ApplicationRead:
     status = client_status(application.status, await last_decision_type(session, application.id))
     data = {c.key: getattr(application, c.key) for c in Application.__mapper__.column_attrs}
@@ -119,6 +171,7 @@ async def to_read(session: AsyncSession, application: Application) -> Applicatio
             "client_status": status,
             "status_description": _status_description(application, status),
             "available_actions": CLIENT_ACTIONS.get(application.status, []),
+            "decline_reasons": await decline_reasons(session, application),
         }
     )
 
@@ -175,6 +228,18 @@ async def create_application(
     )
     if not is_member:
         raise NotFoundError("Компания не найдена")
+    active = await session.scalar(
+        select(Application.number)
+        .where(
+            Application.company_id == body.company_id,
+            Application.status.in_(list(ACTIVE_STATUSES)),
+        )
+        .limit(1)
+    )
+    if active is not None:
+        raise ConflictError(
+            f"У компании уже есть заявка {active} в работе: продолжите её или отмените"
+        )
     product = await session.get(CreditProduct, body.product_id)
     _check_product(product, body.requested_amount, body.requested_term_months, body.purpose)
 
@@ -187,6 +252,13 @@ async def create_application(
     )
     _clear_collateral_if_absent(application)
     session.add(application)
+    await session.flush()
+    # Диалог с ИИ-агентом до создания заявки (подбор параметров) становится её частью
+    await session.execute(
+        update(ChatMessage)
+        .where(ChatMessage.company_id == body.company_id, ChatMessage.application_id.is_(None))
+        .values(application_id=application.id)
+    )
     await session.commit()
     return application
 
@@ -311,6 +383,44 @@ async def decline_pre_approval(
         ActorType.CLIENT,
         user.id,
         close_reason=CloseReason.PRE_APPROVAL_DECLINED,
+    )
+    await session.commit()
+    return application
+
+
+async def cancel_application(
+    session: AsyncSession, user: User, application_id: uuid.UUID
+) -> Application:
+    """Отмена клиентом до решения банка: открытые дозапросы и запросы экспертизы закрываются."""
+    application = await get_client_application(session, user, application_id, for_update=True)
+    if application.status not in CANCELLABLE:
+        raise ConflictError("Заявку на этом этапе отменить нельзя")
+    await session.execute(
+        update(InfoRequest)
+        .where(
+            InfoRequest.application_id == application.id,
+            InfoRequest.status == InfoRequestStatus.OPEN,
+        )
+        .values(status=InfoRequestStatus.CANCELLED)
+    )
+    await session.execute(
+        update(InternalRequest)
+        .where(
+            InternalRequest.application_id == application.id,
+            InternalRequest.status.in_(
+                [InternalRequestStatus.OPEN, InternalRequestStatus.ACCEPTED]
+            ),
+        )
+        .values(status=InternalRequestStatus.CANCELLED, closed_at=datetime.now(UTC))
+    )
+    await transition(
+        session,
+        application,
+        S.CLOSED,
+        ActorType.CLIENT,
+        user.id,
+        comment="Клиент отменил заявку",
+        close_reason=CloseReason.CLIENT_CANCELLED,
     )
     await session.commit()
     return application

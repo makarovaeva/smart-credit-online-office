@@ -4,6 +4,7 @@ from app.api.v1 import (
     applications,
     auth,
     backoffice,
+    chat,
     companies,
     health,
     loans,
@@ -12,5 +13,15 @@ from app.api.v1 import (
 )
 
 api_router = APIRouter(prefix="/api/v1")
-for module in (health, auth, products, companies, applications, loans, notifications, backoffice):
+for module in (
+    health,
+    auth,
+    products,
+    companies,
+    applications,
+    chat,
+    loans,
+    notifications,
+    backoffice,
+):
     api_router.include_router(module.router)

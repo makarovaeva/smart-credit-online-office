@@ -101,6 +101,14 @@ class DocumentType(StrEnum):
     OTHER = "other"
 
 
+class DocumentStatus(StrEnum):
+    """Проверка документа ИИ на этапе ai_verification (симуляция: формат проверен при загрузке)."""
+
+    UPLOADED = "uploaded"
+    VERIFIED = "verified"
+    REJECTED = "rejected"
+
+
 class InfoRequestStatus(StrEnum):
     OPEN = "open"
     ANSWERED = "answered"
@@ -171,12 +179,14 @@ class OfferResponse(StrEnum):
 
 
 class CloseReason(StrEnum):
-    """Четыре пути к финалу «Закрыто без выдачи»."""
+    """Пути к финалу «Закрыто без выдачи»: четыре с доски и отмена клиентом."""
 
     PRE_APPROVAL_DECLINED = "pre_approval_declined"
     AUTO_DECLINED = "auto_declined"
     UNDERWRITER_DECLINED = "underwriter_declined"
     OFFER_REJECTED = "offer_rejected"
+    # Клиент отменил заявку до решения банка
+    CLIENT_CANCELLED = "client_cancelled"
 
 
 class StopFactorCode(StrEnum):
@@ -234,6 +244,8 @@ class CounterOfferScenario(StrEnum):
 
     AUTO_APPROVAL_LIMIT = "auto_approval_limit"
     TERM_EXTENSION = "term_extension"
+    # Больше не применяется: по доске от 23.10 Debt Burden только аналитический показатель.
+    # Значение оставлено, чтобы читались ранее сохранённые Credit Memo
     DEBT_BURDEN_AMOUNT_REDUCTION = "debt_burden_amount_reduction"
     LTV_AMOUNT_REDUCTION = "ltv_amount_reduction"
     RISK_PREMIUM = "risk_premium"
@@ -259,3 +271,45 @@ class PaymentStatus(StrEnum):
     SCHEDULED = "scheduled"
     PAID = "paid"
     OVERDUE = "overdue"
+
+
+class ChatSender(StrEnum):
+    CLIENT = "client"
+    AI_AGENT = "ai_agent"
+
+
+class ChatMessageType(StrEnum):
+    """Вид сообщения чата определяет отображение (формат Chat History из документа модели)."""
+
+    TEXT = "text"
+    # Карточка с параметрами заявки, которые агент разобрал из текста
+    CONFIRMATION_CARD = "confirmation_card"
+    DOCUMENT_REQUEST = "document_request"
+    STATUS_NOTIFICATION = "status_notification"
+    REJECTION_NOTICE = "rejection_notice"
+
+
+class InternalRequestStatus(StrEnum):
+    """Запрос экспертизы андеррайтера у аналитика."""
+
+    OPEN = "open"
+    ACCEPTED = "accepted"
+    COMPLETED = "completed"
+    # Аналитик вернул запрос андеррайтеру с комментарием, без заключения
+    RETURNED = "returned"
+    # Андеррайтер отозвал запрос
+    CANCELLED = "cancelled"
+
+
+class NotificationType(StrEnum):
+    STATUS_CHANGED = "status_changed"
+    DOCUMENT_REQUEST = "document_request"
+    OFFER_READY = "offer_ready"
+    CONTRACT_TO_SIGN = "contract_to_sign"
+    FUNDS_DISBURSED = "funds_disbursed"
+    APPLICATION_DECLINED = "application_declined"
+    # Сотрудникам
+    APPLICATION_ASSIGNED = "application_assigned"
+    EXPERTISE_REQUEST = "expertise_request"
+    REQUEST_RETURNED = "request_returned"
+    REMINDER = "reminder"

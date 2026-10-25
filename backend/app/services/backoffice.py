@@ -16,22 +16,32 @@ from app.models import (
     ApplicationConsent,
     ApplicationStatusHistory,
     Company,
-    CompanyOwner,
     CreditDecision,
     CreditMemo,
     Document,
     ExternalCheck,
     InfoRequest,
+    InternalRequest,
     PreApproval,
     ScoringResult,
     User,
 )
-from app.models.enums import ApplicationStatus, RiskZone, UserRole
+from app.models.enums import (
+    ApplicationStatus,
+    InternalRequestStatus,
+    NotificationType,
+    RiskZone,
+    UserRole,
+)
 from app.schemas.application import ConsentRead, PreApprovalRead, StatusHistoryItem
-from app.schemas.backoffice import BackofficeApplicationDetail, BackofficeApplicationItem
-from app.schemas.company import CompanyOwnerRead, CompanyRead
+from app.schemas.backoffice import (
+    BackofficeApplicationDetail,
+    BackofficeApplicationItem,
+    InternalRequestRead,
+)
 from app.schemas.decision import CreditMemoRead, ExternalCheckRead, ScoringResultRead
 from app.schemas.document import DocumentRead, InfoRequestRead
+from app.services import companies, notifications
 from app.services.applications import to_read
 from app.services.assignment import STAGE_ROLES
 from app.services.errors import ConflictError, ForbiddenError, NotFoundError, ValidationFailedError
@@ -74,8 +84,27 @@ async def list_queue(
 ) -> tuple[list[BackofficeApplicationItem], int]:
     """Свои заявки сотрудника, старые первыми - в порядке очереди."""
     scoring = _latest_scoring()
+    expertise = (
+        select(InternalRequest.status)
+        .where(
+            InternalRequest.application_id == Application.id,
+            InternalRequest.status.in_(
+                [InternalRequestStatus.OPEN, InternalRequestStatus.ACCEPTED]
+            ),
+        )
+        .order_by(InternalRequest.created_at.desc())
+        .limit(1)
+        .scalar_subquery()
+    )
     query = _visible(
-        select(Application, Company.name, Company.inn, scoring.c.risk_zone, scoring.c.risk_grade)
+        select(
+            Application,
+            Company.name,
+            Company.inn,
+            scoring.c.risk_zone,
+            scoring.c.risk_grade,
+            expertise,
+        )
         .join(Company, Company.id == Application.company_id)
         .outerjoin(scoring, scoring.c.application_id == Application.id),
         user,
@@ -97,9 +126,10 @@ async def list_queue(
                 "company_inn": inn,
                 "risk_zone": zone,
                 "risk_grade": grade,
+                "expertise_request": request_status,
             }
         )
-        for application, name, inn, zone, grade in rows
+        for application, name, inn, zone, grade, request_status in rows
     ]
     return items, total or 0
 
@@ -134,10 +164,7 @@ async def get_detail(
     application = await get_visible_application(session, user, application_id)
     company = await session.get(Company, application.company_id)
     assert company is not None
-    owners = await session.scalars(
-        select(CompanyOwner).where(CompanyOwner.company_id == company.id)
-    )
-    owners_read = [CompanyOwnerRead.model_validate(o) for o in owners]
+    company_read = await companies.to_read(session, company)
     pre_approvals = await _all(session, PreApproval, application.id)
     scorings = await _all(session, ScoringResult, application.id)
     memos = await _all(session, CreditMemo, application.id)
@@ -145,8 +172,8 @@ async def get_detail(
 
     return BackofficeApplicationDetail(
         application=await to_read(session, application),
-        company=CompanyRead.model_validate(_columns(company) | {"owners": owners_read}),
-        owners=owners_read,
+        company=company_read,
+        owners=company_read.owners,
         assignee_id=application.assignee_id,
         consents=[
             ConsentRead.model_validate(c)
@@ -166,6 +193,10 @@ async def get_detail(
         info_requests=[
             InfoRequestRead.model_validate(r)
             for r in await _all(session, InfoRequest, application.id)
+        ],
+        internal_requests=[
+            InternalRequestRead.model_validate(r)
+            for r in await _all(session, InternalRequest, application.id)
         ],
         documents=[
             DocumentRead.model_validate(d) for d in await _all(session, Document, application.id)
@@ -191,6 +222,14 @@ async def reassign(
     if assignee is None or not assignee.is_active or assignee.role != role:
         raise ValidationFailedError("Исполнитель должен быть активным сотрудником нужной роли")
     application.assignee_id = assignee.id
+    notifications.add(
+        session,
+        [assignee.id],
+        application,
+        NotificationType.APPLICATION_ASSIGNED,
+        f"Вам передана заявка {application.number}",
+        f"Заявку передал(а) {user.full_name}.",
+    )
     await session.commit()
     # Новый исполнитель видит заявку, прежний - только если уже работал с ней
     return await get_detail(session, assignee, application_id)

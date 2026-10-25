@@ -33,7 +33,8 @@ DEMO_SCENARIOS: dict[str, str] = {
     "7701000015": "Отрицательный Cash Flow 4 месяца подряд: стоп-фактор",
     "7701000016": "Падение выручки на 25%: риск-надбавка",
     "7701000017": "Процедура наблюдения: стоп-фактор",
-    "7701000018": "Пограничный риск: на 5 млн и 36 мес. не проходит, на большем сроке - проходит",
+    "7701000018": "Пограничный риск: на 5 млн и 24 мес. не проходит, на большем сроке - проходит",
+    "7701000019": "Счёт в другом банке: ИИ запрашивает выписку за 12 месяцев",
     "7701000099": "Компании нет в ЕГРЮЛ",
     "770100000001": "ИП, здоровый бизнес",
 }
@@ -73,6 +74,10 @@ def _rub(value: float) -> int:
 def _months_ago(today: date, months: int) -> date:
     total = today.year * 12 + today.month - 1 - months
     return date(total // 12, total % 12 + 1, min(today.day, 28))
+
+
+def _phone(rng: random.Random) -> str:
+    return f"+7 495 {rng.randint(100, 999)}-{rng.randint(10, 99)}-{rng.randint(10, 99)}"
 
 
 def _person(rng: random.Random) -> str:
@@ -155,7 +160,11 @@ def _healthy(inn: str, today: date) -> dict[str, Any]:
             "has_signing_authority": True,
         },
         "owners": owners,
-        "contacts": {"phone": None, "email": f"finance@{inn}.example"},
+        "contacts": {
+            # Отдельный генератор: не сдвигает случайные значения остальных полей профиля
+            "phone": _phone(_rng(f"{inn}:phone")),
+            "email": f"finance@{inn}.example",
+        },
         "fns_data": {
             "retrieved_at": retrieved,
             "egrul_status": "active",
@@ -253,8 +262,16 @@ def _apply_demo(p: dict[str, Any], today: date) -> None:
         case "7701000017":
             fns["bankruptcy_status"] = "observation"
         case "7701000018":
-            fin.update(annual_turnover=40_000_000, ebitda=4_200_000)
+            # 5 млн на 24 мес. (срок по умолчанию в интерфейсе): DSCR ~0,97 - ниже 1,1,
+            # но не стоп-фактор; на 29+ мес. проходит - контр-предложение продлением срока
+            fin.update(annual_turnover=40_000_000, ebitda=3_200_000)
             bki.update(active_loans_count=1, total_debt_amount=690_000, monthly_debt_service=25_000)
+        case "7701000019":
+            p["bank_account"].update(
+                account_number=f"40702810{company['inn'][-10:]}77",
+                bik="044525999",
+                bank_name="АО «Банк Пример»",
+            )
 
 
 def generate_profile(inn: str, today: date) -> BorrowerProfile:

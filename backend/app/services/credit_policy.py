@@ -31,7 +31,6 @@ class PolicyThresholds:
     # Ниже - стоп-фактор, от min_dscr - зелёная зона
     stop_dscr: Decimal = Decimal("0.9")
     min_dscr: Decimal = Decimal("1.1")
-    max_debt_burden: Decimal = Decimal("0.50")
     max_ltv: Decimal = Decimal("0.70")
     max_negative_cash_flow_months: int = 3
     min_confidence: Decimal = Decimal("0.80")
@@ -76,6 +75,23 @@ STOP_FACTORS: dict[StopFactorCode, tuple[StopFactorCategory, str]] = {
     StopFactorCode.MASS_DIRECTOR: (StopFactorCategory.FICTITIOUS, "Массовый директор"),
     StopFactorCode.NO_EMPLOYEES: (StopFactorCategory.FICTITIOUS, "Нет сотрудников"),
     StopFactorCode.NO_TAX_ACTIVITY: (StopFactorCategory.FICTITIOUS, "Нет налоговой активности"),
+}
+
+# Что сказать клиенту при автоотказе: можно ли что-то изменить
+STOP_FACTOR_ADVICE: dict[StopFactorCode, str] = {
+    StopFactorCode.BANKRUPTCY: "Подать заявку можно после завершения процедуры банкротства",
+    StopFactorCode.OBSERVATION_PROCEDURE: "Подать заявку можно после завершения процедуры",
+    StopFactorCode.ACCOUNTS_BLOCKED_115FZ: "Сначала снимите ограничения по счетам по 115-ФЗ",
+    StopFactorCode.SANCTIONED_OWNER: "Банк не кредитует компании с собственниками из санкционных"
+    " списков",
+    StopFactorCode.PROHIBITED_ACTIVITY: "Банк не кредитует этот вид деятельности",
+    StopFactorCode.NEGATIVE_CASH_FLOW: "Повторите заявку, когда денежный поток станет"
+    " положительным несколько месяцев подряд",
+    StopFactorCode.LOW_DSCR: "Снизьте действующую долговую нагрузку или запросите меньшую сумму",
+    StopFactorCode.MASS_ADDRESS: "Обновите адрес регистрации в ЕГРЮЛ",
+    StopFactorCode.MASS_DIRECTOR: "Обновите сведения о руководителе в ЕГРЮЛ",
+    StopFactorCode.NO_EMPLOYEES: "Подтвердите наличие сотрудников в отчётности",
+    StopFactorCode.NO_TAX_ACTIVITY: "Повторите заявку после сдачи налоговой отчётности",
 }
 
 ESCALATION_DESCRIPTIONS: dict[EscalationReasonCode, str] = {
@@ -137,6 +153,7 @@ class Terms:
 @dataclass(frozen=True)
 class Metrics:
     dscr: Decimal
+    # Аналитический показатель для аналитика и андеррайтера, в решениях не участвует.
     # None, если EBITDA <= 0
     debt_burden: Decimal | None
     # None без залога
@@ -290,8 +307,6 @@ def _is_green(data: PolicyInput, terms: Terms, metrics: Metrics, t: PolicyThresh
     return (
         data.min_amount <= terms.amount <= _auto_approval_limit(data, t)
         and metrics.dscr >= t.min_dscr
-        and metrics.debt_burden is not None
-        and metrics.debt_burden <= t.max_debt_burden
         and (metrics.ltv is None or metrics.ltv <= t.max_ltv)
     )
 
@@ -303,8 +318,8 @@ def _round_amount(amount: Decimal, t: PolicyThresholds) -> Decimal:
 def _counter_offer(
     data: PolicyInput, terms: Terms, t: PolicyThresholds
 ) -> tuple[Terms, list[Adjustment]]:
-    """Сценарии 1-5 по порядку: каждый возвращает в зелёную зону с новыми условиями.
-    Ставку из сценария 5 фиксируем заранее: сумму и срок считаем уже от итогового платежа."""
+    """Сценарии 1-4 по порядку: каждый возвращает в зелёную зону с новыми условиями.
+    Ставку из сценария 4 фиксируем заранее: сумму и срок считаем уже от итогового платежа."""
     adjustments: list[Adjustment] = []
     s = data.signals
     base_rate = terms.rate
@@ -345,19 +360,7 @@ def _counter_offer(
                 terms = candidate
                 break
 
-    # 3. Debt Burden >= 50% - уменьшаем сумму
-    if (burden := calculate_metrics(data, terms).debt_burden) is not None and (
-        burden >= t.max_debt_burden
-    ):
-        max_payment = (t.max_debt_burden * data.ebitda - data.existing_annual_debt_service) / 12
-        if max_payment > 0:
-            change_amount(
-                max_amount_for_payment(max_payment, terms.term_months, terms.rate),
-                Scenario.DEBT_BURDEN_AMOUNT_REDUCTION,
-                "Сумма уменьшена до долговой нагрузки не выше 50%",
-            )
-
-    # 4. LTV >= 70% - уменьшаем сумму; добавить залог или гарантию МСП решает аналитик
+    # 3. LTV >= 70% - уменьшаем сумму; добавить залог или гарантию МСП решает аналитик
     pledged = collateral_value(data)
     if pledged and terms.amount / pledged >= t.max_ltv:
         change_amount(
@@ -366,7 +369,7 @@ def _counter_offer(
             "Сумма уменьшена до LTV не выше 70%",
         )
 
-    # 5. Риск выше среднего - сумма сохраняется, ставка растёт на риск-надбавку
+    # 4. Риск выше среднего - сумма сохраняется, ставка растёт на риск-надбавку
     if needs_premium:
         adjustments.append(
             Adjustment(
@@ -395,9 +398,8 @@ def _amount_caps(data: PolicyInput, t: PolicyThresholds) -> Decimal:
 def _max_amount(
     data: PolicyInput, term_months: int, rate: Decimal, t: PolicyThresholds
 ) -> Decimal | None:
-    """Наибольшая сумма на сроке, при которой DSCR >= min_dscr и Debt Burden <= max."""
-    max_debt_service = min(data.ebitda / t.min_dscr, data.ebitda * t.max_debt_burden)
-    payment = (max_debt_service - data.existing_annual_debt_service) / 12
+    """Наибольшая сумма на сроке, при которой DSCR >= min_dscr."""
+    payment = (data.ebitda / t.min_dscr - data.existing_annual_debt_service) / 12
     if payment <= 0:
         return None
     by_payment = max_amount_for_payment(payment, term_months, rate)

@@ -1,12 +1,15 @@
+from pathlib import Path
 from typing import Annotated, NoReturn
+from urllib.parse import quote
 
 from fastapi import Depends, HTTPException, Query, status
+from fastapi.responses import FileResponse, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import InvalidTokenError, decode_access_token
 from app.db.session import get_session
-from app.models import User
+from app.models import Document, User
 from app.models.enums import UserRole
 from app.schemas.common import ErrorResponse
 
@@ -70,6 +73,26 @@ CONFLICT = {
         "description": "Действие недопустимо в текущем статусе заявки или версия устарела",
     }
 }
+
+
+def file_response(document: Document, path: Path) -> FileResponse:
+    """Скачивание документа с исходным именем файла (Content-Disposition: attachment)."""
+    return FileResponse(path, media_type=document.content_type, filename=document.file_name)
+
+
+PDF = "application/pdf"
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+EXPORT_RESPONSES: dict[int | str, dict] = {
+    200: {"content": {PDF: {}, XLSX: {}}, "description": "Файл выгрузки"}
+}
+
+
+def download(content: bytes, media_type: str, filename: str) -> Response:
+    """Файл с именем для сохранения; кириллица - через filename* (RFC 5987)."""
+    # Запасное имя для клиентов без RFC 5987 - латиницей
+    ascii_name = filename if filename.isascii() else "document" + Path(filename).suffix
+    disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename)}"
+    return Response(content, media_type=media_type, headers={"Content-Disposition": disposition})
 
 
 def not_implemented() -> NoReturn:

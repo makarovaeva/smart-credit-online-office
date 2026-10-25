@@ -11,6 +11,8 @@ erDiagram
     users ||--o{ applications : "applicant / assignee"
     credit_products ||--o{ applications : ""
     applications ||--o{ application_consents : ""
+    companies ||--o{ chat_messages : "диалог с ИИ-агентом"
+    applications ||--o{ internal_requests : "запрос экспертизы"
     applications ||--o{ pre_approvals : ""
     applications ||--o{ application_status_history : ""
     applications ||--o{ info_requests : ""
@@ -40,8 +42,11 @@ erDiagram
         string ogrn
         string legal_form "ip | ooo"
         string okved_main
+        string tax_system
         date registration_date
         string actual_address
+        string head_full_name
+        string settlement_account_number
     }
     company_members {
         uuid company_id FK
@@ -53,6 +58,7 @@ erDiagram
         string full_name
         numeric share_percent
         bool is_beneficiary
+        bool has_signing_authority
     }
     credit_products {
         uuid id PK
@@ -97,6 +103,7 @@ erDiagram
         string actor_type "client | system | credit_analyst | underwriter"
     }
     info_requests {
+        string requested_by "system | credit_analyst | underwriter"
         string message
         array requested_document_types
         string status "open | answered | cancelled"
@@ -104,6 +111,7 @@ erDiagram
     documents {
         string type
         string storage_key UK
+        string verification_status "uploaded | verified | rejected"
     }
     external_checks {
         string source "egrul | fns | bki | fssp | bank_turnover | digital_profile"
@@ -162,6 +170,19 @@ erDiagram
         numeric balance_after
         string status "scheduled | paid | overdue"
     }
+    internal_requests {
+        uuid from_user_id FK
+        string status "open | accepted | completed | returned | cancelled"
+        text message
+        text response_comment
+    }
+    chat_messages {
+        string sender_type "client | ai_agent"
+        string message_type "text | confirmation_card | document_request | status_notification | rejection_notice"
+        jsonb card_payload
+        string client_message_id
+        string generated_by "rules | llm:<модель>"
+    }
     notifications {
         string type
         string title
@@ -177,11 +198,13 @@ erDiagram
 | Enum как `varchar + CHECK`, а не нативный `ENUM` Postgres | Добавление статуса/типа не требует `ALTER TYPE` и не блокирует таблицу; целостность сохраняется на уровне БД |
 | Деньги — `numeric(15,2)`, в API — строка | Без потерь точности float |
 | `scoring_results` → `credit_memos` → `credit_decisions` | По политике рекомендация ИИ отделена от финального решения: скоринг даёт метрики и зону, Credit Memo — рекомендацию ИИ и вывод аналитика, решение всегда за андеррайтером |
-| DSCR, Debt Burden, LTV, зона и confidence — отдельные колонки | По ним работает маршрутизация и фильтрация очереди бэкофиса; остальные метрики — в `metrics` (JSONB) |
+| DSCR, Debt Burden, LTV, зона и confidence — отдельные колонки (Debt Burden только аналитический) | По ним работает маршрутизация и фильтрация очереди бэкофиса; остальные метрики — в `metrics` (JSONB) |
 | `stop_factors`, `escalation_reasons`, `factors` в JSONB | Объяснимость: андеррайтер видит, почему заявка ушла к аналитику или в автоотказ и что повлияло на оценку |
-| `credit_memos.counter_offer_adjustments` | Контр-предложение ИИ по сценариям политики (лимит, срок, Debt Burden, LTV, риск-надбавка): что и почему изменилось относительно запроса |
+| `credit_memos.counter_offer_adjustments` | Контр-предложение ИИ по сценариям политики (лимит, срок, LTV, риск-надбавка): что и почему изменилось относительно запроса |
 | `credit_memos.analyst_recommendation` отдельно от `ai_recommendation` | Андеррайтер видит и вывод ИИ, и вывод аналитика; скорректированные аналитиком условия пишутся в `recommended_*` |
 | `created_at` / `updated_at` ставятся в Python (`server_default` — запасной) | Значение доступно сразу после flush без повторного запроса (в async ленивая загрузка невозможна); переходы одной транзакции упорядочены в истории |
+| `info_requests.requested_by` | После ответа клиента заявка возвращается к инициатору дозапроса: ИИ, аналитику или андеррайтеру |
+| `documents.verification_status`, файлы вне БД | Проверенный ИИ документ клиент удалить не может; содержимое — в файловом хранилище (`DOCUMENT_STORAGE_DIR`), ключ формирует backend |
 | `credit_decisions.more_info_target` | У «нужны данные» два возвратных маршрута: документы от клиента или экспертиза аналитика |
 | `applications.close_reason` — enum | Четыре пути к финалу «Закрыто без выдачи» с доски; клиенту показывается причина |
 | `collateral_address`, `collateral_encumbrances`, `pre_approvals.collateral_required` | Консультация с залогом уточняет адрес и обременения; предварительный расчёт показывает необходимость обеспечения |
@@ -191,6 +214,9 @@ erDiagram
 | `pre_approvals` | Клиент видит шансы и диапазон до подачи — ключевой запрос персоны «новый заёмщик» |
 | `company_owners` | Проверка собственников по санкционным спискам и основание эскалации «сложная структура владения» |
 | Сырые ответы внешних источников в `external_checks.result` (JSONB) | Контракты моков могут меняться; сохраняется доказательная база для решения |
+| Профиль компании — снимок в `companies` / `company_owners` (`services/companies.sync_company`) | Реквизиты, руководитель и учредители — из (мока) ЕГРЮЛ, контакты и расчётный счёт — данные клиента банка; снимок обновляется при привязке и запуске сида, фактический адрес и число сотрудников от клиента не затираются. `company_owners.has_signing_authority` + `head_has_signing_authority` дают список подписантов |
+| `chat_messages` у компании, `application_id` — необязательный | Диалог начинается до заявки (подбор параметров); при создании черновика сообщения без заявки привязываются к нему. Уникальный `(company_id, client_message_id)` защищает от дублей при повторе запроса; `generated_by` показывает, кто сформулировал ответ — шаблоны или LLM |
+| `internal_requests` отдельно от `info_requests` | Запрос экспертизы андеррайтера у аналитика — внутренний, клиент его не видит; у него свой цикл (принят, закрыт заключением, возвращён, отозван) и он разделяет вкладки очереди аналитика |
 | `users.phone` уникален | Клиент входит по номеру телефона |
 | `applications.assignee_id` ставится при входе на этап | Аналитик и андеррайтер работают со своими заявками; назначение — в `services/assignment.py`, вызывается из `transition()` |
 | `application_status_history` | Аудит (кто, когда, почему изменил статус) и таймлайн в кабинете клиента |

@@ -19,10 +19,10 @@ def test_green_zone_path_is_allowed() -> None:
         (S.DATA_COLLECTION, S.PRE_APPROVED, A.SYSTEM),
         (S.PRE_APPROVED, S.SUBMITTED, A.CLIENT),
         (S.SUBMITTED, S.AI_VERIFICATION, A.SYSTEM),
-        (S.AI_VERIFICATION, S.AI_FINANCIAL_ANALYSIS, A.SYSTEM),
-        (S.AI_FINANCIAL_ANALYSIS, S.AI_RISK_SCORING, A.SYSTEM),
+        (S.AI_VERIFICATION, S.AI_RISK_SCORING, A.SYSTEM),
         (S.AI_RISK_SCORING, S.DECISION_ROUTING, A.SYSTEM),
-        (S.DECISION_ROUTING, S.UNDERWRITER_REVIEW, A.SYSTEM),
+        (S.DECISION_ROUTING, S.AI_FINANCIAL_ANALYSIS, A.SYSTEM),
+        (S.AI_FINANCIAL_ANALYSIS, S.UNDERWRITER_REVIEW, A.SYSTEM),
         (S.UNDERWRITER_REVIEW, S.OFFER_GENERATED, A.UNDERWRITER),
         (S.OFFER_GENERATED, S.OFFER_ACCEPTED, A.CLIENT),
         (S.OFFER_ACCEPTED, S.CONTRACT_GENERATION, A.SYSTEM),
@@ -43,13 +43,31 @@ def test_analyst_escalation_returns_to_underwriter() -> None:
 def test_only_underwriter_decides() -> None:
     for actor in (A.SYSTEM, A.CREDIT_ANALYST, A.CLIENT):
         assert not can_transition(S.UNDERWRITER_REVIEW, S.OFFER_GENERATED, actor)
+    for actor in (A.SYSTEM, A.CREDIT_ANALYST):
         assert not can_transition(S.UNDERWRITER_REVIEW, S.CLOSED, actor)
+
+
+def test_client_cancels_before_decision_only() -> None:
+    """Клиент закрывает заявку только отменой до решения (close_reason=client_cancelled);
+    после оффера - отказом от оффера."""
+    for status in (S.DRAFT, S.SUBMITTED, S.NEED_ADDITIONAL_DATA, S.ANALYST_ESCALATION):
+        assert can_transition(status, S.CLOSED, A.CLIENT)
+    assert can_transition(S.UNDERWRITER_REVIEW, S.CLOSED, A.CLIENT)
+    for status in (S.OFFER_GENERATED, S.E_SIGN, S.DISBURSEMENT):
+        assert not can_transition(status, S.CLOSED, A.CLIENT)
 
 
 def test_auto_decline_only_on_routing() -> None:
     assert can_transition(S.DECISION_ROUTING, S.CLOSED, A.SYSTEM)
     for status in (S.AI_VERIFICATION, S.AI_FINANCIAL_ANALYSIS, S.AI_RISK_SCORING):
         assert not can_transition(status, S.CLOSED, A.SYSTEM)
+
+
+def test_financial_analysis_only_on_green_route() -> None:
+    """По доске от 23.10 финанализ идёт после маршрутизации и только к андеррайтеру."""
+    assert not can_transition(S.AI_VERIFICATION, S.AI_FINANCIAL_ANALYSIS, A.SYSTEM)
+    assert not can_transition(S.DECISION_ROUTING, S.UNDERWRITER_REVIEW, A.SYSTEM)
+    assert not can_transition(S.AI_FINANCIAL_ANALYSIS, S.ANALYST_ESCALATION, A.SYSTEM)
 
 
 def test_documents_return_to_verification_or_underwriter() -> None:

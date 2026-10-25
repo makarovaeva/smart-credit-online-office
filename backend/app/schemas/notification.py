@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from app.schemas.common import ORMModel
+from app.schemas.common import ORMModel, Page
 
 
 class NotificationRead(ORMModel):
@@ -12,3 +12,7 @@ class NotificationRead(ORMModel):
     body: str
     read_at: datetime | None
     created_at: datetime
+
+
+class NotificationPage(Page[NotificationRead]):
+    unread: int

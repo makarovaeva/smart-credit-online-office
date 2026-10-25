@@ -3,9 +3,10 @@ import uuid
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
-from app.api.deps import NOT_FOUND, SessionDep, not_implemented
+from app.api.deps import NOT_FOUND, SessionDep
 from app.models import CreditProduct
 from app.schemas.product import ProductMatch, ProductMatchRequest, ProductRead
+from app.services.products import match
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -28,6 +29,7 @@ async def get_product(product_id: uuid.UUID, session: SessionDep) -> ProductRead
 
 
 @router.post("/match")
-async def match_products(body: ProductMatchRequest) -> list[ProductMatch]:
-    """Подбор продуктов под потребность: подходящие первыми, с пояснениями и примерным платежом."""
-    not_implemented()
+async def match_products(body: ProductMatchRequest, session: SessionDep) -> list[ProductMatch]:
+    """Подбор продуктов под потребность: подходящие первыми, с пояснениями и примерным платежом
+    (аннуитет по базовой ставке на условиях, ближайших к запрошенным в рамках продукта)."""
+    return await match(session, body)

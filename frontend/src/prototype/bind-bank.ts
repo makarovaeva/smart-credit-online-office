@@ -11,6 +11,8 @@ export const money = (value: unknown) => {
 const date = (value: unknown) => value ? new Date(String(value)).toLocaleDateString("ru-RU") : "—";
 const statuses: Record<string, string> = { draft: "Черновик", pre_approved: "Предварительное одобрение", underwriter_review: "Рассмотрение", analyst_escalation: "Эскалация аналитику", analyst_completed: "Заключение готово", need_additional_data: "Нужны документы", offer_generated: "Оффер сформирован", e_sign: "Договор на подписание", disbursement: "Выдача средств", completed: "Кредит выдан", closed: "Заявка закрыта" };
 Object.assign(statuses, { data_collection: "Сбор данных", submitted: "Заявка отправлена", ai_verification: "Проверка документов", ai_financial_analysis: "Финансовый анализ", ai_risk_scoring: "Оценка риска", decision_routing: "Маршрутизация заявки", offer_accepted: "Оффер принят", offer_rejected: "Оффер отклонён", contract_generation: "Подготовка договора", approved: "Одобрено", conditional_approval: "Одобрено с изменениями", declined: "Отказано", accepted: "Принят", rejected: "Отклонён", active: "Действует", green: "Зелёная зона", yellow: "Жёлтая зона", red: "Красная зона" });
+const legalForms: Record<string, string> = { ooo: "ООО", ip: "ИП" };
+const taxSystems: Record<string, string> = { usn_income: "УСН «Доходы»", usn_income_expense: "УСН «Доходы минус расходы»", osno: "ОСНО", psn: "Патент", eshn: "ЕСХН" };
 export const statusLabel = (value: unknown) => statuses[str(value)] ?? str(value);
 const terminal = (a: ObjectData) => ["closed", "completed"].includes(str(a.status));
 
@@ -20,7 +22,9 @@ function tabRows(name: string, rows: ObjectData[]) {
     if (name.includes("Closed")) return rows.filter(a => a.status === "closed");
     if (name.includes("Done")) return rows.filter(a => a.status === "completed");
   }
-  if (name === "A_AnalystNew.dc.html" || name === "A_AnalystFromUw.dc.html") return rows.filter(a => a.status === "analyst_escalation");
+  // Новые эскалации - от ИИ, запросы от андеррайтера - с активным запросом экспертизы
+  if (name === "A_AnalystNew.dc.html") return rows.filter(a => a.status === "analyst_escalation" && !a.expertise_request);
+  if (name === "A_AnalystFromUw.dc.html") return rows.filter(a => a.status === "analyst_escalation" && !!a.expertise_request);
   if (name === "A_AnalystInWork.dc.html") return rows.filter(a => a.status === "need_additional_data");
   if (name === "U_Pending.dc.html") return rows.filter(a => a.status === "underwriter_review");
   if (name === "U_Mine.dc.html") return rows;
@@ -103,8 +107,12 @@ export function bindBank(html: string, name: string, bank: BankState & { draft: 
     "Срок": `${str((displayedOffer ? offer.approved_term_months : app.requested_term_months) ?? bank.draft.term)} мес.`, "Ставка": offer.interest_rate ? `${offer.interest_rate}% годовых` : loan.interest_rate ? `${loan.interest_rate}% годовых` : estimatedRate ? `${estimatedRate}% годовых` : "—",
     "Ежемесячный платёж": money(offer.estimated_monthly_payment ?? loan.monthly_payment),
     "Остаток долга": money(loan.outstanding_balance), "Ближайший платёж": object(loan.next_payment).total_amount ? `${money(object(loan.next_payment).total_amount)} · ${date(object(loan.next_payment).due_date)}` : "—",
-    "Полное наименование": company.name, "Организационно-правовая форма": company.legal_form, "ИНН": company.inn, "КПП": company.kpp, "ОГРН / ОГРНИП": company.ogrn,
-    "Дата регистрации": date(company.registration_date), "Основной ОКВЭД": company.okved_main, "Регион ведения бизнеса": company.region, "Число сотрудников": company.employees_count, "Юридический адрес": company.legal_address,
+    "Полное наименование": company.full_name ?? company.name, "Организационно-правовая форма": legalForms[str(company.legal_form)] ?? company.legal_form, "ИНН": company.inn, "КПП": company.kpp ?? "—", "ОГРН / ОГРНИП": company.ogrn,
+    "Дата регистрации": date(company.registration_date), "Основной ОКВЭД": company.okved_name ? `${str(company.okved_main)} · ${str(company.okved_name)}` : company.okved_main, "Система налогообложения": taxSystems[str(company.tax_system)] ?? company.tax_system ?? "—", "Регион ведения бизнеса": company.region, "Число сотрудников": company.employees_count, "Юридический адрес": company.legal_address,
+    "Руководитель": object(company.head).full_name ?? "—", "Должность": object(company.head).position ?? "—",
+    "Бенефициарные владельцы": list(company.owners).filter(o => o.is_beneficiary).map(o => o.share_percent ? `${str(o.full_name)}, ${Number(o.share_percent)}%` : str(o.full_name)).join("; ") || "—",
+    "Право подписи": list(company.signatories).map(str).join(", ") || "—", "Телефон": company.phone ?? "—", "Электронная почта": company.email ?? "—",
+    "Расчётный счёт": object(company.settlement_account).account_number ? `${str(object(company.settlement_account).account_number)} · ${str(object(company.settlement_account).bank_name)}` : "—",
     "DSCR": scoring.dscr, "Debt Burden (аналитический)": scoring.debt_burden ? `${(Number(scoring.debt_burden) * 100).toFixed(2)}%` : "—", "LTV": scoring.ltv === undefined || scoring.ltv === null ? "—" : `${(Number(scoring.ltv) * 100).toFixed(2)}%`,
     "Риск-грейд": scoring.risk_grade, "Уверенность модели": scoring.confidence !== undefined ? `${Number(scoring.confidence) * 100}%` : "—",
     "Стоп-факторы": list(scoring.stop_factors).map(f => str(f.description)).join(", ") || "—",
@@ -133,12 +141,16 @@ export function bindBank(html: string, name: string, bank: BankState & { draft: 
     value = value.replace(/№\[номер\]/g, `№${str(app.number)}`);
     value = value.replace(/3 000 000 ₽/g, money(loanTerms ? loan.principal_amount : app.requested_amount ?? bank.draft.amount));
     value = value.replace(/24 месяца/g, `${str(loanTerms ? loan.term_months : app.requested_term_months ?? bank.draft.term)} мес.`);
+    const expertise = list(detail.internal_requests).filter(r => ["open", "accepted"].includes(str(r.status))).at(-1);
+    const info = list(detail.info_requests).filter(r => r.status === "open").at(-1);
+    if (expertise) value = value.replace(/\[(Текст вопроса для экспертизы|текст вопроса)\]/g, str(expertise.message));
+    if (info) value = value.replace("[перечень документов]", str(info.message));
     value = value.replace(/\[[^\]]+\]/g, "—");
     text.textContent = value;
   }
 
   if (!employee) {
-    doc.querySelectorAll("p").forEach(p => { if (/^Причин[аы]:/.test(p.textContent?.trim() ?? "")) p.textContent = list(offer.reasons).map(r => str(r.message)).join("; ") || str(app.status_description); });
+    doc.querySelectorAll("p").forEach(p => { if (/^Причин[аы]:/.test(p.textContent?.trim() ?? "")) p.textContent = list(app.decline_reasons).map(r => r.advice ? `${str(r.message)}. ${str(r.advice)}` : str(r.message)).join("; ") || list(offer.reasons).map(r => str(r.message)).join("; ") || str(app.status_description); });
     const chips = doc.querySelectorAll("main > section > div > .chip, main > section > .chip");
     chips.forEach(chip => { chip.textContent = str(app.status_description ?? statusLabel(app.status)); });
     if (name.includes("Chat") && !name.includes("ChatEdit")) {
@@ -149,8 +161,28 @@ export function bindBank(html: string, name: string, bank: BankState & { draft: 
           if (child.tagName === "DIV" && !parameters && !child.querySelector('input[aria-label="Сообщение"]')) child.remove();
           if (parameters) for (const text of Array.from(child.childNodes)) if (text.nodeType === Node.TEXT_NODE && text.textContent?.trim()) text.textContent = "Параметры заявки:";
         }
-        const message = doc.createElement("p"); message.className = "t"; message.textContent = "Диалог с помощником пока недоступен. Ниже можно подтвердить параметры заявки.";
-        section.querySelector("h2")?.after(message);
+        // История диалога с ИИ-агентом из API
+        const bubbles = bank.chat.length ? bank.chat : [{ sender_type: "ai_agent", content: "Здравствуйте! Подберу кредит под ваш бизнес. Напишите, какая сумма и на какой срок нужна и на что пойдут средства." }];
+        let anchor: Element | null = section.querySelector("h2");
+        for (const item of bubbles) {
+          const client = item.sender_type === "client";
+          const bubble = doc.createElement("div");
+          bubble.dataset.chatMessage = str(item.message_type ?? "text");
+          bubble.style.cssText = client ? "align-self:flex-end;max-width:480px;background:#d92d20;color:#fff;border-radius:16px;padding:14px 16px;white-space:pre-line" : "max-width:560px;background:#f3f4f5;border-radius:16px;padding:14px 16px;white-space:pre-line";
+          bubble.textContent = str(item.content);
+          const fields = object(object(item.card_payload).fields);
+          if (item.message_type === "confirmation_card") {
+            const card = doc.createElement("div"); card.style.cssText = "margin-top:12px;background:#fff;color:#0b1f35;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px";
+            const rows: [string, unknown][] = [["Сумма", fields.amount ? money(fields.amount) : "—"], ["Срок", fields.term_months ? `${str(fields.term_months)} мес.` : "—"], ["Цель", fields.purpose_label ?? "—"], ["Залог", fields.collateral_label ?? "—"], ["Продукт", fields.product_name ?? "—"]];
+            for (const [label, value] of rows) {
+              const row = doc.createElement("div"); row.style.cssText = "display:flex;justify-content:space-between;gap:16px";
+              const caption = doc.createElement("span"); caption.style.color = "#5c6b7a"; caption.textContent = label;
+              const strong = doc.createElement("b"); strong.textContent = str(value); row.append(caption, strong); card.append(row);
+            }
+            bubble.append(card);
+          }
+          anchor?.after(bubble); anchor = bubble;
+        }
         if (app.id && Array.isArray(app.available_actions) && app.available_actions.includes("upload_documents")) {
           const upload = doc.createElement("label"); upload.style.cssText = "border:1px dashed #5c6b7a;border-radius:12px;padding:16px;cursor:pointer";
           upload.textContent = "Выбрать документ для заявки";
@@ -169,6 +201,19 @@ export function bindBank(html: string, name: string, bank: BankState & { draft: 
     const tbody = doc.querySelector("table tbody");
     if (tbody) {
       tbody.replaceChildren();
+      // Договор и график из выгрузок backend - первыми строками
+      if (bank.contract?.application_id) {
+        const contractApp = str(bank.contract.application_id);
+        const rows: [string, unknown, string, string][] = [
+          [`Кредитный договор №${str(bank.contract.contract_number)}`, bank.contract.signed_at ?? bank.contract.created_at, bank.contract.signed_at ? "Подписан" : "Проект", "document"],
+          ["График платежей (XLSX)", bank.contract.signed_at ?? bank.contract.created_at, "Действует", "schedule-export?format=xlsx"],
+        ];
+        for (const [title, when, state, path] of rows) {
+          const tr = doc.createElement("tr"); tr.style.borderTop = "1px solid #eceef0";
+          for (const value of [title, date(when), state]) { const td = doc.createElement("td"); td.style.padding = "16px 8px"; td.textContent = str(value); tr.append(td); }
+          const td = doc.createElement("td"); const link = doc.createElement("a"); link.className = "bs"; link.textContent = "Скачать"; link.href = `/api/backend/applications/${contractApp}/contract/${path}`; link.download = ""; td.append(link); tr.append(td); tbody.append(tr);
+        }
+      }
       for (const file of bank.documents) {
         const tr = doc.createElement("tr"); tr.style.borderTop = "1px solid #eceef0";
         for (const value of [file.file_name, date(file.created_at), "Загружен"]) { const td = doc.createElement("td"); td.style.padding = "16px 8px"; td.textContent = str(value); tr.append(td); }

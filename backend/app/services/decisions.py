@@ -8,12 +8,20 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.models import Application, CreditDecision, CreditMemo, InfoRequest, User
+from app.models import (
+    Application,
+    CreditDecision,
+    CreditMemo,
+    InfoRequest,
+    InternalRequest,
+    User,
+)
 from app.models.enums import (
     ActorType,
     ApplicationStatus,
     CloseReason,
     DecisionType,
+    InternalRequestStatus,
     MoreInfoTarget,
 )
 from app.schemas.decision import AnalystConclusionRequest, UnderwriterDecisionRequest
@@ -71,6 +79,22 @@ async def complete_analysis(
     memo.analyst_conclusion = body.conclusion
     memo.analyst_recommendation = body.recommendation
     memo.analyst_completed_at = datetime.now(UTC)
+    # Заключение закрывает запрос экспертизы андеррайтера, если он был
+    expertise = await session.scalar(
+        select(InternalRequest)
+        .where(
+            InternalRequest.application_id == application.id,
+            InternalRequest.status.in_(
+                [InternalRequestStatus.OPEN, InternalRequestStatus.ACCEPTED]
+            ),
+        )
+        .with_for_update()
+    )
+    if expertise is not None:
+        expertise.status = InternalRequestStatus.COMPLETED
+        expertise.accepted_by_id = expertise.accepted_by_id or analyst.id
+        expertise.response_comment = body.conclusion
+        expertise.closed_at = memo.analyst_completed_at
     # Условия меняются, только если аналитик их передал
     for field in ("recommended_amount", "recommended_term_months", "recommended_rate"):
         if field in body.model_fields_set:
@@ -161,12 +185,20 @@ async def make_decision(
     )
     session.add(decision)
 
+    if target == S.ANALYST_ESCALATION:
+        assert body.comment is not None
+        session.add(
+            InternalRequest(
+                application_id=application.id, from_user_id=underwriter.id, message=body.comment
+            )
+        )
     if target == S.NEED_ADDITIONAL_DATA:
         assert body.info_request is not None
         session.add(
             InfoRequest(
                 application_id=application.id,
                 created_by_id=underwriter.id,
+                requested_by=ActorType.UNDERWRITER,
                 message=body.info_request.message,
                 requested_document_types=body.info_request.requested_document_types,
             )
