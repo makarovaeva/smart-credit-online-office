@@ -32,22 +32,26 @@ cp .env.example .env    # необязательно: без .env работаю
 docker compose up --build
 ```
 
-- API: http://localhost:8000, Swagger: http://localhost:8000/docs
-- Клиентский кабинет: http://localhost:3000 (вход — `/login`)
-- PostgreSQL: `localhost:5432` (`credit` / `credit`)
+| Сервис | Адрес | Что это |
+|---|---|---|
+| `frontend` | http://localhost:3000 (вход — `/login`, сотрудники — `/staff/login`) | Кабинет клиента и рабочие места сотрудников (Next.js) |
+| `backend` | http://localhost:8000, Swagger — `/docs` | API и кредитный конвейер (FastAPI) |
+| `ml` | только внутри сети compose | Скоринг: вероятность дефолта и SHAP-факторы (CatBoost) |
+| `db` | `localhost:5432` (`credit` / `credit`) | PostgreSQL |
 
-Если порты заняты, поменяйте `BACKEND_PORT` и `POSTGRES_PORT` в `.env`.
+Связи: `frontend → backend → db`, `backend → ml`. Фронтенд ходит в API через свой серверный слой (JWT в HttpOnly-cookie). Бэкенд берёт скоринг из `ml`; если сервис недоступен, скоринг откатывается на встроенные правила, и сценарий продолжает работать.
 
-При старте backend накатывает миграции и загружает демо-данные (`scripts/seed.py`, идемпотентно; отключается `SEED_DEMO_DATA=false`). Данные БД хранятся в volume `postgres_data`. Начать с чистой базы: `docker compose down -v`.
+Если порты заняты, поменяйте `FRONTEND_PORT`, `BACKEND_PORT` и `POSTGRES_PORT` в `.env`.
+
+При старте backend накатывает миграции и загружает демо-данные (`scripts/seed.py`, идемпотентно; отключается `SEED_DEMO_DATA=false`). Модель скоринга обучается при сборке образа `ml` на синтетических данных генератора с фиксированным seed. Данные БД хранятся в volume `postgres_data`. Начать с чистой базы: `docker compose down -v`.
 
 Датасет профилей заёмщиков от ML кладётся в `data/` и подключается переменной `BORROWER_DATASET_PATH` (см. [`data/README.md`](data/README.md)).
 
 **Фиксация версий:**
-- зависимости backend — `backend/uv.lock`; образ собирается с `uv sync --locked`, поэтому сборка падает, если lock отстал от `pyproject.toml`;
-- базовые образы — точные теги: `python:3.12.15-slim`, `postgres:16.15-alpine`;
-- `uv` — `0.13.5`.
-
-Frontend включён в Docker Compose. ML-сервис пока представлен шаблоном в комментариях.
+- backend — `backend/uv.lock`; образ собирается с `uv sync --locked`, поэтому сборка падает, если lock отстал от `pyproject.toml`;
+- ML-сервис — `ml/service/requirements.lock` (все пакеты с хешами, `pip install --require-hashes`);
+- frontend — `frontend/package-lock.json` (`npm ci`), Node — `.nvmrc` и Dockerfile;
+- базовые образы — точные теги: `python:3.12.15-slim`, `node:24.22.1-alpine`, `postgres:16.15-alpine`; `uv` — `0.13.5`.
 
 ## Разработка frontend
 

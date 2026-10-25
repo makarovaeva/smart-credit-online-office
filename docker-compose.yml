@@ -1,4 +1,5 @@
 # Единая точка запуска решения: docker compose up --build (из корня репозитория).
+# frontend -> backend -> db; backend -> ml (скоринг, при недоступности - правила).
 # Настройки - в .env (шаблон: .env.example), без него работают значения по умолчанию.
 name: smart-credit
 
@@ -34,13 +35,17 @@ services:
       SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
       # Датасет профилей заёмщиков от ML в ./data; пусто - моки генерируют данные сами
       BORROWER_DATASET_PATH: ${BORROWER_DATASET_PATH:-}
-      SCORING_MODEL: ${SCORING_MODEL:-rules}
+      # ml - модель скоринга из сервиса ml; rules - встроенные правила
+      SCORING_MODEL: ${SCORING_MODEL:-ml}
+      ML_SERVICE_URL: http://ml:8000
     volumes:
       - ./data:/data:ro
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
       db:
+        condition: service_healthy
+      ml:
         condition: service_healthy
     healthcheck:
       test:
@@ -74,22 +79,24 @@ services:
       retries: 5
     networks: [app]
 
-  # ML-сервис подключается, когда появится:
-  #
-  # frontend:
-  #   build: ./frontend
-  #   ports: ["${FRONTEND_PORT:-3000}:3000"]
-  #   environment:
-  #     API_URL: http://backend:8000/api/v1
-  #   depends_on:
-  #     backend: {condition: service_healthy}
-  #   networks: [app]
-  #
-  # ml:
-  #   build: ./ml
-  #   healthcheck: ...
-  #   networks: [app]
-  # + у backend: SCORING_MODEL и адрес ML-сервиса, depends_on: ml
+  ml:
+    build: ./ml
+    image: smart-credit/ml:local
+    restart: unless-stopped
+    environment:
+      ML_MODEL_NAME: ${ML_MODEL_NAME:-catboost}
+      ML_CALIBRATION: ${ML_CALIBRATION:-platt}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks: [app]
 
 volumes:
   postgres_data:

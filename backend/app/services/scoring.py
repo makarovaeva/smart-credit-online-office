@@ -1,12 +1,18 @@
 """Скоринг заёмщика: балл, Risk Grade A-E, уверенность модели и fraud-score.
 
-Контракт ScoringModel: на входе плоские признаки Features.values, на выходе ScoringOutput.
-Модель ML подключается реализацией ScoringModel и настройкой SCORING_MODEL; пока её нет,
-работает прозрачная модель на правилах. Скоринг - вход для политики, а не кредитное решение.
+Контракт ScoringModel: на входе плоские признаки Features.values и контекст (профиль и заявка
+в формате контракта ML), на выходе ScoringOutput. Реализация выбирается настройкой SCORING_MODEL:
+rules - прозрачная модель на правилах, ml - сервис инференса ML (ml/service) с откатом на правила.
+Скоринг - вход для политики, а не кредитное решение.
 """
 
+import asyncio
+import json
+import logging
+import urllib.request
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from datetime import date
 from decimal import Decimal
 from typing import Any, Protocol
 
@@ -39,8 +45,19 @@ class ScoringOutput:
     factors: list[ScoringFactor] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class ScoringContext:
+    """Профиль заёмщика и заявка в формате docs/credit_mmb_data_model_updated.md -
+    вход модели ML. None, если профиль собрать не удалось (не ответил источник)."""
+
+    profile: dict[str, Any] | None = None
+    application: dict[str, Any] | None = None
+
+
 class ScoringModel(Protocol):
-    async def score(self, features: Mapping[str, Any]) -> ScoringOutput: ...
+    async def score(
+        self, features: Mapping[str, Any], context: ScoringContext | None = None
+    ) -> ScoringOutput: ...
 
 
 def grade_for(score: int) -> RiskGrade:
@@ -55,7 +72,9 @@ class RuleBasedScoring:
 
     version = "rules-1"
 
-    async def score(self, features: Mapping[str, Any]) -> ScoringOutput:
+    async def score(
+        self, features: Mapping[str, Any], context: ScoringContext | None = None
+    ) -> ScoringOutput:
         factors: list[ScoringFactor] = []
 
         def add(code: str, impact: int, description: str) -> None:
@@ -120,7 +139,115 @@ class RuleBasedScoring:
         return Decimal(sum(signals)) / len(signals)
 
 
-_MODELS: dict[str, ScoringModel] = {"rules": RuleBasedScoring()}
+logger = logging.getLogger(__name__)
+
+
+def _json_default(value: Any) -> Any:
+    """Деньги в контракте ML - числа, даты - ISO."""
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, date):
+        return value.isoformat()
+    raise TypeError(f"Не сериализуется в JSON: {type(value).__name__}")
+
+
+# Вероятность дефолта (калиброванная, на синтетических метках) -> Risk Grade
+PD_GRADE_BANDS = (
+    (Decimal("0.03"), RiskGrade.A),
+    (Decimal("0.06"), RiskGrade.B),
+    (Decimal("0.12"), RiskGrade.C),
+    (Decimal("0.25"), RiskGrade.D),
+)
+
+
+def grade_for_pd(pd: Decimal) -> RiskGrade:
+    for threshold, grade in PD_GRADE_BANDS:
+        if pd <= threshold:
+            return grade
+    return RiskGrade.E
+
+
+# Опорные точки «вероятность дефолта -> балл» на границах грейдов: балл и грейд согласованы
+# со шкалой GRADE_BANDS (A от 800, B от 720, C от 650, D от 580)
+_PD_SCORE_POINTS = (
+    (Decimal("0"), MAX_SCORE),
+    (Decimal("0.03"), 800),
+    (Decimal("0.06"), 720),
+    (Decimal("0.12"), 650),
+    (Decimal("0.25"), 580),
+    (Decimal("1"), MIN_SCORE),
+)
+
+
+def score_for_pd(pd: Decimal) -> int:
+    """Балл 300-900: кусочно-линейно между опорными точками."""
+    pd = min(max(pd, Decimal(0)), Decimal(1))
+    for (pd_lo, score_lo), (pd_hi, score_hi) in zip(
+        _PD_SCORE_POINTS, _PD_SCORE_POINTS[1:], strict=False
+    ):
+        if pd <= pd_hi:
+            share = (pd - pd_lo) / (pd_hi - pd_lo)
+            return round(score_lo + (score_hi - score_lo) * share)
+    return MIN_SCORE
+
+
+class MLServiceScoring:
+    """Модель ML через HTTP-сервис. Вероятность дефолта и SHAP-факторы - от модели;
+    уверенность и fraud-score - по полноте и противоречивости данных, как у правил
+    (модель их не отдаёт). Если сервис недоступен или данные не проходят контракт
+    признаков, используется модель на правилах - демо не зависит от ML-сервиса."""
+
+    def __init__(self, fallback: RuleBasedScoring) -> None:
+        self.fallback = fallback
+
+    def _post(self, payload: dict[str, Any]) -> dict[str, Any]:
+        settings = get_settings()
+        request = urllib.request.Request(
+            f"{settings.ml_service_url}/score",
+            data=json.dumps(payload, ensure_ascii=False, default=_json_default).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(request, timeout=settings.ml_timeout_seconds) as response:
+            return json.load(response)
+
+    async def score(
+        self, features: Mapping[str, Any], context: ScoringContext | None = None
+    ) -> ScoringOutput:
+        rules = await self.fallback.score(features)
+        if context is None or context.profile is None or context.application is None:
+            return replace(rules, model_version=f"{rules.model_version} (нет данных для ML)")
+        try:
+            result = await asyncio.to_thread(
+                self._post, {"profile": context.profile, "application": context.application}
+            )
+        except Exception as exc:  # сеть, 422 по контракту признаков, 5xx
+            logger.warning("ML-скоринг недоступен, используются правила: %s", exc)
+            return replace(rules, model_version=f"{rules.model_version} (ML недоступен)")
+
+        pd = Decimal(str(result["calibrated_probability"]))
+        factors = [
+            ScoringFactor(
+                code=item["feature"],
+                value=features.get(item["feature"]),
+                # SHAP в логитах риска: + повышает риск, у нас + снижает
+                impact=-round(item["impact_log_odds"] * 100),
+                description=item["name_ru"],
+            )
+            for item in result.get("risk_increasing_factors", [])
+            + result.get("risk_reducing_factors", [])
+        ]
+        return ScoringOutput(
+            model_version=f"ml-{result['model']}-{result['calibration']}",
+            score=score_for_pd(pd),
+            risk_grade=grade_for_pd(pd),
+            confidence=rules.confidence,
+            fraud_score=rules.fraud_score,
+            factors=factors,
+        )
+
+
+_RULES = RuleBasedScoring()
+_MODELS: dict[str, ScoringModel] = {"rules": _RULES, "ml": MLServiceScoring(_RULES)}
 
 
 def get_scoring_model() -> ScoringModel:
