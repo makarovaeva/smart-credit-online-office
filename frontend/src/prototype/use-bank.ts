@@ -208,7 +208,18 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
         if (open.length !== 1) throw new Error("Выберите конкретный дозапрос перед отправкой ответа");
         const message = root.querySelector<HTMLInputElement>('input[aria-label="Сообщение"]')?.value;
         await post(`/applications/${id}/info-requests/${open[0].id}/answer`, { message: message || null }); await load(id);
-      } else if (["Передать ИИ-агенту", "Принять в работу", "Вернуть с комментарием", "Напомнить клиенту через ИИ-агента", "Напомнить аналитику", "Отозвать запрос", "Отправить"].includes(text)) {
+      } else if (text === "Передать ИИ-агенту" && current === "A_RequestDocs.dc.html") {
+        if (!id) throw new Error("Выберите заявку");
+        const checked = Array.from(root.querySelectorAll<HTMLInputElement>('input[type="checkbox"]:checked')).map(input => (input.closest("label")?.textContent ?? input.parentElement?.textContent ?? "").trim());
+        if (!checked.length && !textarea) throw new Error("Отметьте документы или напишите, что уточнить у клиента");
+        const requestedTypes = [...new Set(checked.flatMap(label => {
+          const lower = label.toLowerCase();
+          return lower.includes("договор") ? ["contract"] : lower.includes("оборот") ? ["bank_statement"] : lower.includes("пояснен") ? [] : ["other"];
+        }))];
+        const message = [textarea, checked.length ? `Нужно: ${checked.join("; ")}` : ""].filter(Boolean).join("\n");
+        await post(`/backoffice/applications/${id}/info-requests`, { message, requested_document_types: requestedTypes });
+        await load(id); transition("A_Analyst.dc.html");
+      } else if (["Принять в работу", "Вернуть с комментарием", "Напомнить клиенту через ИИ-агента", "Напомнить аналитику", "Отозвать запрос", "Отправить"].includes(text)) {
         throw new Error("Для этого действия ещё нет рабочего backend API. Запрос не отправлен.");
       } else if (text === "Скачать" || text.includes("Скачать график") || text === "Кредитный договор") {
         throw new Error("Выберите документ в списке. Скачивание доступно только для файлов, возвращённых API.");

@@ -5,12 +5,13 @@ from sqlalchemy import ARRAY, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
-from app.models.enums import DocumentType, InfoRequestStatus
+from app.models.enums import ActorType, DocumentStatus, DocumentType, InfoRequestStatus
 from app.models.mixins import CreatedAtMixin, UUIDPkMixin, str_enum
 
 
 class InfoRequest(UUIDPkMixin, CreatedAtMixin, Base):
-    """Дозапрос информации у клиента: от системы (проверка полноты) или андеррайтера."""
+    """Дозапрос информации у клиента: от ИИ (проверка комплекта), аналитика или андеррайтера.
+    От инициатора зависит, куда вернётся заявка после ответа."""
 
     __tablename__ = "info_requests"
 
@@ -19,6 +20,9 @@ class InfoRequest(UUIDPkMixin, CreatedAtMixin, Base):
     )
     # NULL - дозапрос сформирован автоматически
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    requested_by: Mapped[ActorType] = mapped_column(
+        str_enum(ActorType), default=ActorType.SYSTEM, server_default=ActorType.SYSTEM.value
+    )
     message: Mapped[str] = mapped_column(Text)
     requested_document_types: Mapped[list[DocumentType]] = mapped_column(
         ARRAY(str_enum(DocumentType, check=False)), default=list
@@ -31,7 +35,8 @@ class InfoRequest(UUIDPkMixin, CreatedAtMixin, Base):
 
 
 class Document(UUIDPkMixin, CreatedAtMixin, Base):
-    """Файл заявки. Содержимое лежит в объектном хранилище, в БД только метаданные."""
+    """Файл заявки. Содержимое лежит в файловом хранилище (services/storage.py),
+    в БД только метаданные."""
 
     __tablename__ = "documents"
 
@@ -45,3 +50,8 @@ class Document(UUIDPkMixin, CreatedAtMixin, Base):
     size_bytes: Mapped[int]
     storage_key: Mapped[str] = mapped_column(String(500), unique=True)
     uploaded_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    verification_status: Mapped[DocumentStatus] = mapped_column(
+        str_enum(DocumentStatus),
+        default=DocumentStatus.UPLOADED,
+        server_default=DocumentStatus.UPLOADED.value,
+    )

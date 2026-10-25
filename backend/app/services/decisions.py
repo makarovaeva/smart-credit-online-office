@@ -167,6 +167,7 @@ async def make_decision(
             InfoRequest(
                 application_id=application.id,
                 created_by_id=underwriter.id,
+                requested_by=ActorType.UNDERWRITER,
                 message=body.info_request.message,
                 requested_document_types=body.info_request.requested_document_types,
             )

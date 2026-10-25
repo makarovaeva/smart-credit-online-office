@@ -2,6 +2,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Query, status
+from fastapi.responses import FileResponse
 
 from app.api.deps import (
     AUTH_RESPONSES,
@@ -13,6 +14,7 @@ from app.api.deps import (
     Limit,
     Offset,
     SessionDep,
+    file_response,
 )
 from app.models.enums import ApplicationStatus, RiskZone
 from app.schemas.backoffice import (
@@ -27,8 +29,9 @@ from app.schemas.decision import (
     DecisionRead,
     UnderwriterDecisionRequest,
 )
+from app.schemas.document import InfoRequestCreate, InfoRequestRead
 from app.schemas.loan import LoanContractRead
-from app.services import backoffice, decisions, loans, offers
+from app.services import backoffice, decisions, documents, loans, offers
 from app.services.offers import to_decision_read
 
 router = APIRouter(
@@ -99,6 +102,38 @@ async def make_decision(
     declined -> closed."""
     decision = await decisions.make_decision(session, underwriter, application_id, body)
     return to_decision_read(decision)
+
+
+@router.post(
+    "/{application_id}/info-requests", status_code=status.HTTP_201_CREATED, responses=CONFLICT
+)
+async def request_documents(
+    application_id: uuid.UUID, body: InfoRequestCreate, analyst: CurrentAnalyst, session: SessionDep
+) -> InfoRequestRead:
+    """Аналитик запрашивает документы у клиента через ИИ-агента:
+    analyst_escalation -> need_additional_data. Когда клиент ответит, заявка вернётся
+    к аналитику (analyst_escalation). Андеррайтер запрашивает документы решением
+    more_information_required."""
+    request = await documents.request_documents_by_analyst(session, analyst, application_id, body)
+    return InfoRequestRead.model_validate(request)
+
+
+@router.get(
+    "/{application_id}/documents/{document_id}/content",
+    response_class=FileResponse,
+    responses={200: {"content": {"application/octet-stream": {}}}},
+)
+async def download_document(
+    application_id: uuid.UUID,
+    document_id: uuid.UUID,
+    employee: CurrentEmployee,
+    session: SessionDep,
+) -> FileResponse:
+    """Скачать файл документа своей заявки (список - в карточке заявки)."""
+    document, path = await documents.get_employee_document(
+        session, employee, application_id, document_id
+    )
+    return file_response(document, path)
 
 
 @router.post("/{application_id}/contract", responses=CONFLICT)

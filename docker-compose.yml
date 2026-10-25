@@ -40,8 +40,12 @@ services:
       # auto - договор готовится сразу; analyst - его готовит кредитный аналитик
       CONTRACT_PREPARATION: ${CONTRACT_PREPARATION:-auto}
       ML_SERVICE_URL: http://ml:8000
+      # Файлы документов заявок - в томе documents
+      DOCUMENT_STORAGE_DIR: /var/lib/smart-credit/documents
+      DOCUMENT_MAX_SIZE_MB: ${DOCUMENT_MAX_SIZE_MB:-20}
     volumes:
       - ./data:/data:ro
+      - documents:/var/lib/smart-credit/documents
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -102,6 +106,7 @@ services:
 
 volumes:
   postgres_data:
+  documents:
 
 networks:
   app:

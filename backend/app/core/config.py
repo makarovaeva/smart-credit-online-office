@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     # аналитик командой POST /backoffice/applications/{id}/contract (как на доске от 23.10)
     contract_preparation: Literal["auto", "analyst"] = "auto"
 
+    # Файлы документов заявок; в docker-compose - отдельный том
+    document_storage_dir: str = "var/documents"
+    document_max_size_mb: int = 20
+
     # Срок действия оффера на доске не задан - открытый вопрос
     offer_validity_days: int = 30
 

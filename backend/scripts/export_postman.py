@@ -41,6 +41,7 @@ def request(
     *,
     token: str | None = None,
     body: dict[str, Any] | None = None,
+    form: list[dict[str, str]] | None = None,
     query: dict[str, str] | None = None,
     tests: list[str] | None = None,
     status: int = 200,
@@ -65,6 +66,9 @@ def request(
     }
     if description:
         item["request"]["description"] = description
+    if form is not None:
+        # multipart/form-data: Content-Type с boundary проставляет Postman
+        item["request"]["body"] = {"mode": "formdata", "formdata": form}
     if body is not None:
         item["request"]["body"] = {
             "mode": "raw",
@@ -456,6 +460,82 @@ def build_collection() -> dict[str, Any]:
         ),
     ]
 
+    documents = client_start("docs", "+7 999 000-00-06", "3000000.00")
+    documents[-1]["event"][0]["script"]["exec"] += [
+        js_expect("pm.response.json().status", "need_additional_data"),
+        js_expect("pm.response.json().client_status", "documents_required"),
+    ]
+    documents += [
+        request(
+            "Клиент: дозапрос ИИ",
+            "GET",
+            "/applications/{{docsAppId}}/info-requests",
+            token="docsToken",
+            description="Счёт в другом банке - ИИ запрашивает выписку за 12 месяцев.",
+            tests=[
+                js_set("docsRequestId", "pm.response.json()[0].id"),
+                js_expect("pm.response.json()[0].requested_by", "system"),
+                js_expect("pm.response.json()[0].requested_document_types[0]", "bank_statement"),
+            ],
+        ),
+        request(
+            "Клиент: загрузить выписку",
+            "POST",
+            "/applications/{{docsAppId}}/documents",
+            token="docsToken",
+            status=201,
+            form=[
+                {"key": "file", "type": "file", "src": "files/vypiska.pdf"},
+                {"key": "type", "type": "text", "value": "bank_statement"},
+                {"key": "info_request_id", "type": "text", "value": "{{docsRequestId}}"},
+            ],
+            description="Файл - docs/postman/files/vypiska.pdf (в Postman выберите его вручную).",
+            tests=[
+                js_set("docsDocumentId", "pm.response.json().id"),
+                js_expect("pm.response.json().content_type", "application/pdf"),
+            ],
+        ),
+        request(
+            "Клиент: документы заявки",
+            "GET",
+            "/applications/{{docsAppId}}/documents",
+            token="docsToken",
+            tests=[
+                "pm.test('один документ', () => pm.expect(pm.response.json()).to.have.length(1));"
+            ],
+        ),
+        request(
+            "Клиент: ответить на дозапрос",
+            "POST",
+            "/applications/{{docsAppId}}/info-requests/{{docsRequestId}}/answer",
+            token="docsToken",
+            body={"message": "Выписка за 12 месяцев приложена"},
+            description="Все дозапросы закрыты - ИИ повторно проверяет комплект, конвейер "
+            "продолжается.",
+            tests=[js_expect("pm.response.json().status", "answered")],
+        ),
+        request(
+            "Клиент: заявка у андеррайтера",
+            "GET",
+            "/applications/{{docsAppId}}",
+            token="docsToken",
+            tests=[js_expect("pm.response.json().status", "underwriter_review")],
+        ),
+        employee_login(
+            "Андеррайтер: вход", "docsUwToken", ("underwriter1", "underwriter2"), "docsAppId"
+        ),
+        request(
+            "Андеррайтер: скачать выписку",
+            "GET",
+            "/backoffice/applications/{{docsAppId}}/documents/{{docsDocumentId}}/content",
+            token="docsUwToken",
+            tests=[
+                "pm.test('PDF', () => pm.expect(pm.response.headers.get('Content-Type'))"
+                ".to.include('application/pdf'));"
+            ],
+        ),
+    ]
+
     errors = [
         request("401: без токена", "GET", "/applications", status=401),
         request(
@@ -540,7 +620,13 @@ def build_collection() -> dict[str, Any]:
             "Клиент +7 999 000-00-04: бизнесу 7 месяцев, жёлтая зона, заключение аналитика.",
             escalation,
         ),
-        folder("5. Ошибки", "Коды ответов при ошибочных сценариях.", errors),
+        folder(
+            "5. Документы и дозапрос",
+            "Клиент +7 999 000-00-06: счёт в другом банке, ИИ запрашивает выписку, клиент "
+            "загружает её и отвечает, конвейер продолжается, андеррайтер скачивает файл.",
+            documents,
+        ),
+        folder("6. Ошибки", "Коды ответов при ошибочных сценариях.", errors),
     ]
     for f in folders:
         for item in f["item"]:

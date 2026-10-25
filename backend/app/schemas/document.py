@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from app.models.enums import DocumentType, InfoRequestStatus
+from app.models.enums import ActorType, DocumentStatus, DocumentType, InfoRequestStatus
 from app.schemas.common import ORMModel
 
 
@@ -15,12 +15,15 @@ class DocumentRead(ORMModel):
     file_name: str
     content_type: str
     size_bytes: int
+    verification_status: DocumentStatus
     created_at: datetime
 
 
 class InfoRequestRead(ORMModel):
     id: uuid.UUID
     application_id: uuid.UUID
+    # system - ИИ (комплект документов), credit_analyst, underwriter
+    requested_by: ActorType
     message: str
     requested_document_types: list[DocumentType]
     status: InfoRequestStatus
@@ -35,6 +38,7 @@ class InfoRequestCreate(BaseModel):
 
 
 class InfoRequestAnswer(BaseModel):
-    """Документы к ответу загружаются заранее с info_request_id."""
+    """Документы к ответу загружаются заранее (с info_request_id или без него). Если в дозапросе
+    перечислены типы документов, нужен хотя бы один файл каждого типа, иначе - сообщение."""
 
     message: str | None = Field(default=None, max_length=2000)

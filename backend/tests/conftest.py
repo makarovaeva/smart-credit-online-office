@@ -17,6 +17,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from app.core.config import get_settings
 from app.core.security import create_access_token, hash_password
 from app.db.session import get_session
 from app.main import app
@@ -42,6 +43,14 @@ def migrated_db() -> str:
         capture_output=True,
     )
     return TEST_DATABASE_URL
+
+
+@pytest.fixture(autouse=True)
+def document_storage(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """Файлы документов - во временном каталоге теста."""
+    path = tmp_path / "documents"
+    monkeypatch.setattr(get_settings(), "document_storage_dir", str(path))
+    return path
 
 
 @pytest.fixture

@@ -1521,6 +1521,7 @@
           "applications"
         ],
         "summary": "Upload Document",
+        "description": "Загрузить документ: до подачи (draft, pre_approved) или по дозапросу\n(need_additional_data, можно указать info_request_id). Форматы: PDF, PNG, JPEG, XLSX, XLS,\nDOCX, CSV; содержимое должно соответствовать расширению; размер - до\nDOCUMENT_MAX_SIZE_MB (20 МБ).",
         "operationId": "upload_document_api_v1_applications__application_id__documents_post",
         "security": [
           {
@@ -1783,6 +1784,7 @@
           "applications"
         ],
         "summary": "Delete Document",
+        "description": "Удалить документ, который банк ещё не проверил, - только на этапах загрузки.",
         "operationId": "delete_document_api_v1_applications__application_id__documents__document_id__delete",
         "security": [
           {
@@ -1874,6 +1876,7 @@
           "applications"
         ],
         "summary": "List Info Requests",
+        "description": "Дозапросы банка: от ИИ (комплект документов), аналитика или андеррайтера.",
         "operationId": "list_info_requests_api_v1_applications__application_id__info_requests_get",
         "security": [
           {
@@ -1956,7 +1959,7 @@
           "applications"
         ],
         "summary": "Answer Info Request",
-        "description": "Ответить на дозапрос. Когда закрыты все открытые дозапросы:\nдозапрос ИИ - need_additional_data -> ai_verification (повторная проверка комплекта),\nдозапрос андеррайтера - need_additional_data -> underwriter_review.",
+        "description": "Ответить на дозапрос: сначала загрузить запрошенные документы (по файлу каждого типа),\nбез запрошенных документов нужен текст ответа. Когда закрыты все открытые дозапросы,\nзаявка возвращается к инициатору: ИИ - need_additional_data -> ai_verification\n(повторная проверка комплекта, конвейер продолжается), аналитик -> analyst_escalation,\nандеррайтер -> underwriter_review.",
         "operationId": "answer_info_request_api_v1_applications__application_id__info_requests__info_request_id__answer_post",
         "security": [
           {
@@ -3278,6 +3281,190 @@
           },
           "409": {
             "description": "Действие недопустимо в текущем статусе заявки или версия устарела",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/backoffice/applications/{application_id}/info-requests": {
+      "post": {
+        "tags": [
+          "backoffice"
+        ],
+        "summary": "Request Documents",
+        "description": "Аналитик запрашивает документы у клиента через ИИ-агента:\nanalyst_escalation -> need_additional_data. Когда клиент ответит, заявка вернётся\nк аналитику (analyst_escalation). Андеррайтер запрашивает документы решением\nmore_information_required.",
+        "operationId": "request_documents_api_v1_backoffice_applications__application_id__info_requests_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InfoRequestCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InfoRequestRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Нет или невалидный токен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Недостаточно прав",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Объект не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Действие недопустимо в текущем статусе заявки или версия устарела",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/backoffice/applications/{application_id}/documents/{document_id}/content": {
+      "get": {
+        "tags": [
+          "backoffice"
+        ],
+        "summary": "Download Document",
+        "description": "Скачать файл документа своей заявки (список - в карточке заявки).",
+        "operationId": "download_document_api_v1_backoffice_applications__application_id__documents__document_id__content_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          },
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/octet-stream": {}
+            }
+          },
+          "401": {
+            "description": "Нет или невалидный токен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Недостаточно прав",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Объект не найден",
             "content": {
               "application/json": {
                 "schema": {
@@ -5567,6 +5754,9 @@
             "type": "integer",
             "title": "Size Bytes"
           },
+          "verification_status": {
+            "$ref": "#/components/schemas/DocumentStatus"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -5582,9 +5772,20 @@
           "file_name",
           "content_type",
           "size_bytes",
+          "verification_status",
           "created_at"
         ],
         "title": "DocumentRead"
+      },
+      "DocumentStatus": {
+        "type": "string",
+        "enum": [
+          "uploaded",
+          "verified",
+          "rejected"
+        ],
+        "title": "DocumentStatus",
+        "description": "Проверка документа ИИ на этапе ai_verification (симуляция: формат проверен при загрузке)."
       },
       "DocumentType": {
         "type": "string",
@@ -5751,7 +5952,7 @@
         },
         "type": "object",
         "title": "InfoRequestAnswer",
-        "description": "Документы к ответу загружаются заранее с info_request_id."
+        "description": "Документы к ответу загружаются заранее (с info_request_id или без него). Если в дозапросе\nперечислены типы документов, нужен хотя бы один файл каждого типа, иначе - сообщение."
       },
       "InfoRequestCreate": {
         "properties": {
@@ -5787,6 +5988,9 @@
             "type": "string",
             "format": "uuid",
             "title": "Application Id"
+          },
+          "requested_by": {
+            "$ref": "#/components/schemas/ActorType"
           },
           "message": {
             "type": "string",
@@ -5835,6 +6039,7 @@
         "required": [
           "id",
           "application_id",
+          "requested_by",
           "message",
           "requested_document_types",
           "status",

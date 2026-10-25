@@ -11,7 +11,7 @@ Postman-коллекция с примерами запросов и сквоз�
 - очереди, карточка и назначение в бэкофисе;
 - `/companies/lookup` на моке ЕГРЮЛ (демо-ИНН — в [`../external-sources.md`](../external-sources.md)).
 
-Остальные эндпоинты пока заглушки (`501`), но контракт зафиксирован: `/products/match`, привязка компаний, документы и ответы на дозапросы, `/notifications`.
+Остальные эндпоинты пока заглушки (`501`), но контракт зафиксирован: `/products/match`, привязка компаний, `/notifications`.
 
 Этапы конвейера ИИ запускаются сразу после команд клиента. `/consents` возвращает заявку уже в `pre_approved`. `/submit` возвращает её в `underwriter_review`, `analyst_escalation`, `need_additional_data` или `closed` (автоотказ). Подробно — [`../application-lifecycle.md`](../application-lifecycle.md#кредитный-конвейер).
 
@@ -68,9 +68,11 @@ cd backend && uv run python -m scripts.export_openapi
 | POST | `/applications/{id}/pre-approval/decline` | Не продолжать: `pre_approved → closed` |
 | POST | `/applications/{id}/submit` | Подать заявку: `pre_approved → submitted` |
 | GET | `/applications/{id}/history` | Таймлайн статусов |
-| POST/GET/DELETE | `/applications/{id}/documents[...]` | Документы |
-| GET | `/applications/{id}/info-requests` | Дозапросы (от ИИ или андеррайтера) |
-| POST | `/applications/{id}/info-requests/{rid}/answer` | Ответить: `need_additional_data → ai_verification` (дозапрос ИИ) или `→ underwriter_review` (дозапрос андеррайтера) |
+| POST/GET | `/applications/{id}/documents` | Загрузить (multipart: `file`, `type`, необязательный `info_request_id`) / список. Загрузка — в `draft`, `pre_approved`, `need_additional_data` |
+| GET | `/applications/{id}/documents/{doc}/content` | Скачать файл |
+| DELETE | `/applications/{id}/documents/{doc}` | Удалить ещё не проверенный документ на этапе загрузки |
+| GET | `/applications/{id}/info-requests` | Дозапросы от ИИ, аналитика или андеррайтера (`requested_by`) |
+| POST | `/applications/{id}/info-requests/{rid}/answer` | Ответить; когда закрыты все дозапросы, заявка возвращается к инициатору: `ai_verification` (конвейер продолжается), `analyst_escalation` или `underwriter_review` |
 | GET | `/applications/{id}/offer` | Оффер или контр-предложение (`decision_type=conditional_approval`) |
 | POST | `/applications/{id}/offer/accept`, `/reject` | Принять / отказаться от оффера |
 | POST | `/applications/{id}/sign` | Подписание и выдача (симуляция): `e_sign → disbursement → completed` |
@@ -87,6 +89,8 @@ cd backend && uv run python -m scripts.export_openapi
 | GET | `/backoffice/applications/{id}` | аналитик, андеррайтер, админ | Карточка своей заявки: компания, учредители, проверки, метрики, скоринг, AI Credit Memo, решения, история |
 | POST | `/backoffice/applications/{id}/assign` | сотрудник этапа, админ | Передать заявку другому сотруднику той же роли |
 | POST | `/backoffice/applications/{id}/analyst-conclusion` | аналитик | Заключение: `analyst_escalation → analyst_completed → underwriter_review` |
+| POST | `/backoffice/applications/{id}/info-requests` | аналитик (исполнитель) | Запрос документов у клиента через ИИ: `analyst_escalation → need_additional_data`, после ответа — обратно к аналитику |
+| GET | `/backoffice/applications/{id}/documents/{doc}/content` | аналитик, андеррайтер, админ | Скачать файл документа своей заявки |
 | POST | `/backoffice/applications/{id}/contract` | аналитик (исполнитель) | Подготовка договора: `contract_generation → e_sign`. Нужна при `CONTRACT_PREPARATION=analyst`, в режиме `auto` договор готовится сам |
 | POST | `/backoffice/applications/{id}/decision` | андеррайтер | Одно из 4 решений. `more_information_required` с `more_info_target`: `client` — дозапрос документов, `credit_analyst` — запрос экспертизы. `conditional_approval` с `alternative_offer` берёт условия варианта из AI Credit Memo |
 

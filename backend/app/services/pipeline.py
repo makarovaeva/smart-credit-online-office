@@ -4,7 +4,9 @@
 - после согласий: data_collection -> pre_approved (предварительный расчёт);
 - после подачи: submitted -> ai_verification -> ai_risk_scoring -> decision_routing
   -> ai_financial_analysis -> underwriter_review (зелёная зона) | analyst_escalation (жёлтая)
-  | closed (автоотказ) или need_additional_data, если не хватает финансовых данных.
+  | closed (автоотказ) или need_additional_data, если не хватает документов
+  (services/document_requirements.py). После ответа клиента на дозапрос ИИ прогон
+  повторяется с ai_verification.
 
 Каждый прогон - одна транзакция: при ошибке заявка остаётся на исходном этапе.
 Финальное решение по зелёной и жёлтой зоне принимает андеррайтер.
@@ -19,11 +21,14 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.integrations import CompanyNotFoundError, get_profile
 from app.integrations.dataset import BorrowerProfile
 from app.models import (
     Application,
+    Company,
     CreditMemo,
     CreditProduct,
+    Document,
     InfoRequest,
     PreApproval,
     ScoringResult,
@@ -34,7 +39,7 @@ from app.models.enums import (
     CheckSource,
     CloseReason,
     CollateralType,
-    DocumentType,
+    DocumentStatus,
     EscalationReasonCode,
     LoanPurpose,
     RiskGrade,
@@ -47,6 +52,7 @@ from app.services.credit_policy import (
     PolicyResult,
     evaluate,
 )
+from app.services.document_requirements import request_message, required_documents
 from app.services.enrichment import (
     application_features,
     collect_external_data,
@@ -387,35 +393,72 @@ def _credit_memo(
     )
 
 
-async def _request_financials(session: AsyncSession, application: Application) -> None:
-    session.add(
-        InfoRequest(
-            application_id=application.id,
-            message=(
-                "Не удалось получить финансовую отчётность из ФНС. Загрузите бухгалтерскую "
-                "или управленческую отчётность за последний год"
-            ),
-            requested_document_types=[
-                DocumentType.FINANCIAL_STATEMENT,
-                DocumentType.MANAGEMENT_REPORT,
-            ],
+async def _check_documents(
+    session: AsyncSession, application: Application, has_financials: bool
+) -> InfoRequest | None:
+    """Проверка комплекта документов ИИ: загруженные файлы считаются проверенными
+    (формат проверен при загрузке), по недостающим - дозапрос клиенту."""
+    documents = list(
+        await session.scalars(
+            select(Document).where(
+                Document.application_id == application.id,
+                Document.verification_status != DocumentStatus.REJECTED,
+            )
         )
     )
-    await transition(session, application, S.NEED_ADDITIONAL_DATA, SYSTEM)
+    for document in documents:
+        document.verification_status = DocumentStatus.VERIFIED
+    uploaded = {d.type for d in documents}
+
+    company = await session.get(Company, application.company_id)
+    assert company is not None
+    try:
+        bank_account = get_profile(company.inn).bank_account
+    except CompanyNotFoundError:
+        bank_account = None
+    missing = [
+        r
+        for r in required_documents(application, bank_account, has_financials)
+        if r.type not in uploaded
+    ]
+    if missing:
+        return InfoRequest(
+            application_id=application.id,
+            requested_by=SYSTEM,
+            message=request_message(missing),
+            requested_document_types=[r.type for r in missing],
+        )
+    if not has_financials:
+        # Отчётность загружена, но показатели из неё распознавание не извлекает
+        return InfoRequest(
+            application_id=application.id,
+            requested_by=SYSTEM,
+            message=(
+                "Укажите в анкете годовую выручку и EBITDA по загруженной отчётности "
+                "и ответьте на запрос"
+            ),
+        )
+    return None
 
 
 async def run_assessment(session: AsyncSession, application: Application) -> None:
-    """Проверка -> скоринг -> маршрутизация: зелёная зона через финансовый анализ
-    к андеррайтеру, жёлтая - к аналитику, красная - автоотказ."""
+    """Проверка комплекта документов -> скоринг -> маршрутизация: зелёная зона через
+    финансовый анализ к андеррайтеру, жёлтая - к аналитику, красная - автоотказ.
+    Не хватает документов - дозапрос клиенту (need_additional_data)."""
     product = await session.get(CreditProduct, application.product_id)
     assert product is not None
 
-    await transition(session, application, S.AI_VERIFICATION, SYSTEM)
+    # После ответа на дозапрос ИИ заявка уже на ai_verification - проверка повторяется
+    if application.status == S.SUBMITTED:
+        await transition(session, application, S.AI_VERIFICATION, SYSTEM)
     features, scoring, policy = await _assess(session, application, product)
-    if policy is None:
-        await _request_financials(session, application)
+    info_request = await _check_documents(session, application, policy is not None)
+    if info_request is not None:
+        session.add(info_request)
+        await transition(session, application, S.NEED_ADDITIONAL_DATA, SYSTEM)
         await session.commit()
         return
+    assert policy is not None
 
     await transition(session, application, S.AI_RISK_SCORING, SYSTEM)
     scoring_result = _scoring_result(application, features, scoring, policy)
