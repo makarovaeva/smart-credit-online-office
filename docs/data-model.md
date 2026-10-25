@@ -97,6 +97,7 @@ erDiagram
         string actor_type "client | system | credit_analyst | underwriter"
     }
     info_requests {
+        string requested_by "system | credit_analyst | underwriter"
         string message
         array requested_document_types
         string status "open | answered | cancelled"
@@ -104,6 +105,7 @@ erDiagram
     documents {
         string type
         string storage_key UK
+        string verification_status "uploaded | verified | rejected"
     }
     external_checks {
         string source "egrul | fns | bki | fssp | bank_turnover | digital_profile"
@@ -182,6 +184,8 @@ erDiagram
 | `credit_memos.counter_offer_adjustments` | Контр-предложение ИИ по сценариям политики (лимит, срок, LTV, риск-надбавка): что и почему изменилось относительно запроса |
 | `credit_memos.analyst_recommendation` отдельно от `ai_recommendation` | Андеррайтер видит и вывод ИИ, и вывод аналитика; скорректированные аналитиком условия пишутся в `recommended_*` |
 | `created_at` / `updated_at` ставятся в Python (`server_default` — запасной) | Значение доступно сразу после flush без повторного запроса (в async ленивая загрузка невозможна); переходы одной транзакции упорядочены в истории |
+| `info_requests.requested_by` | После ответа клиента заявка возвращается к инициатору дозапроса: ИИ, аналитику или андеррайтеру |
+| `documents.verification_status`, файлы вне БД | Проверенный ИИ документ клиент удалить не может; содержимое — в файловом хранилище (`DOCUMENT_STORAGE_DIR`), ключ формирует backend |
 | `credit_decisions.more_info_target` | У «нужны данные» два возвратных маршрута: документы от клиента или экспертиза аналитика |
 | `applications.close_reason` — enum | Четыре пути к финалу «Закрыто без выдачи» с доски; клиенту показывается причина |
 | `collateral_address`, `collateral_encumbrances`, `pre_approvals.collateral_required` | Консультация с залогом уточняет адрес и обременения; предварительный расчёт показывает необходимость обеспечения |

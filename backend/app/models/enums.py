@@ -101,6 +101,14 @@ class DocumentType(StrEnum):
     OTHER = "other"
 
 
+class DocumentStatus(StrEnum):
+    """Проверка документа ИИ на этапе ai_verification (симуляция: формат проверен при загрузке)."""
+
+    UPLOADED = "uploaded"
+    VERIFIED = "verified"
+    REJECTED = "rejected"
+
+
 class InfoRequestStatus(StrEnum):
     OPEN = "open"
     ANSWERED = "answered"

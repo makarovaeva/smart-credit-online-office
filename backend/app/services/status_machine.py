@@ -21,9 +21,10 @@ TRANSITIONS: dict[tuple[ApplicationStatus, ApplicationStatus], frozenset[ActorTy
     (S.SUBMITTED, S.AI_VERIFICATION): SYSTEM,
     (S.AI_VERIFICATION, S.AI_RISK_SCORING): SYSTEM,
     (S.AI_VERIFICATION, S.NEED_ADDITIONAL_DATA): SYSTEM,
-    # Документы досланы: дозапрос ИИ - повторная проверка комплекта,
-    # дозапрос андеррайтера - сразу повторное рассмотрение
+    # Клиент ответил на дозапрос - заявка возвращается к инициатору: дозапрос ИИ - повторная
+    # проверка комплекта, аналитика - к аналитику, андеррайтера - сразу повторное рассмотрение
     (S.NEED_ADDITIONAL_DATA, S.AI_VERIFICATION): CLIENT,
+    (S.NEED_ADDITIONAL_DATA, S.ANALYST_ESCALATION): CLIENT,
     (S.NEED_ADDITIONAL_DATA, S.UNDERWRITER_REVIEW): CLIENT,
     (S.AI_RISK_SCORING, S.NEED_ADDITIONAL_DATA): SYSTEM,
     (S.AI_RISK_SCORING, S.DECISION_ROUTING): SYSTEM,
@@ -35,6 +36,7 @@ TRANSITIONS: dict[tuple[ApplicationStatus, ApplicationStatus], frozenset[ActorTy
     (S.AI_FINANCIAL_ANALYSIS, S.UNDERWRITER_REVIEW): SYSTEM,
     # Блок 04. Исключения
     (S.ANALYST_ESCALATION, S.ANALYST_COMPLETED): ANALYST,
+    (S.ANALYST_ESCALATION, S.NEED_ADDITIONAL_DATA): ANALYST,  # запрос документов через ИИ
     (S.ANALYST_COMPLETED, S.UNDERWRITER_REVIEW): SYSTEM,
     # Блок 05. Решения андеррайтера
     (S.UNDERWRITER_REVIEW, S.OFFER_GENERATED): UNDERWRITER,  # approved / conditional_approval

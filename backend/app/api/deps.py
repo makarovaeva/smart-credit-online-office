@@ -1,12 +1,14 @@
+from pathlib import Path
 from typing import Annotated, NoReturn
 
 from fastapi import Depends, HTTPException, Query, status
+from fastapi.responses import FileResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import InvalidTokenError, decode_access_token
 from app.db.session import get_session
-from app.models import User
+from app.models import Document, User
 from app.models.enums import UserRole
 from app.schemas.common import ErrorResponse
 
@@ -70,6 +72,11 @@ CONFLICT = {
         "description": "Действие недопустимо в текущем статусе заявки или версия устарела",
     }
 }
+
+
+def file_response(document: Document, path: Path) -> FileResponse:
+    """Скачивание документа с исходным именем файла (Content-Disposition: attachment)."""
+    return FileResponse(path, media_type=document.content_type, filename=document.file_name)
 
 
 def not_implemented() -> NoReturn:

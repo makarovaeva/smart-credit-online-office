@@ -23,7 +23,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
 
-RUN useradd --create-home --uid 1000 app
+RUN useradd --create-home --uid 1000 app \
+    && mkdir -p /var/lib/smart-credit/documents \
+    && chown app:app /var/lib/smart-credit/documents
 WORKDIR /app
 
 COPY --from=builder /opt/venv /opt/venv

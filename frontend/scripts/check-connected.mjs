@@ -97,8 +97,8 @@ try {
   await wait("document.querySelectorAll('table tbody tr').length === 24");
   console.log("Offer acceptance, signing, disbursement and actual payment schedule verified");
   await navigate("/documents");
-  await wait("document.body.innerText.includes('Документы недоступны')");
-  console.log("Unimplemented documents are shown as unavailable, not simulated");
+  await wait("document.body.innerText.includes('Документов нет')");
+  console.log("Documents list loaded from API (no files for this application)");
   }
 
   await login("/login", ["+7 999 000-00-03"], "client");
@@ -118,9 +118,36 @@ try {
     if (queue.data.items.some(a => a.id === escalation.id)) { analystFound = true; break; }
   }
   if (!analystFound) throw new Error("Escalation absent from analyst queues");
-  await wait(`!!document.querySelector('[data-application-id="${escalation.id}"]')`);
-  await evaluate(`document.querySelector('[data-application-id="${escalation.id}"]').click()`);
-  await new Promise(r => setTimeout(r, 800));
+  const analystLogin = (await api("/api/session")).data.email;
+  const openEscalation = async () => {
+    await wait(`!!document.querySelector('[data-application-id="${escalation.id}"]')`);
+    await evaluate(`document.querySelector('[data-application-id="${escalation.id}"]').click()`);
+    await new Promise(r => setTimeout(r, 800));
+  };
+  await openEscalation();
+  await click("Запросить документы через ИИ-агента");
+  await wait("document.querySelector('[data-screen-name]')?.dataset.screenName === 'A_RequestDocs.dc.html'");
+  await evaluate("Array.from(document.querySelectorAll('label')).find(l => l.textContent.includes('Подтверждение оборота')).querySelector('input').click(); document.querySelector('textarea').value = 'Подтвердите обороты за последние 12 месяцев'");
+  await click("Передать ИИ-агенту");
+  await wait("document.querySelector('[data-screen-name]')?.dataset.screenName === 'A_Analyst.dc.html' && !document.querySelector('[aria-busy=true]')");
+  const requested = await api(`/api/backend/backoffice/applications/${escalation.id}`);
+  const docRequest = requested.data.info_requests.at(-1);
+  if (requested.data.application.status !== "need_additional_data" || docRequest?.requested_by !== "credit_analyst" || docRequest.requested_document_types[0] !== "bank_statement") throw new Error(`Analyst document request not persisted: ${JSON.stringify(requested.data.info_requests)}`);
+  console.log("Analyst document request sent to the client through UI");
+
+  await login("/login", ["+7 999 000-00-04"], "client");
+  const uploaded = await evaluate(`(() => { const data = new FormData(); data.append("file", new Blob(["%PDF-1.4\\n%%EOF\\n"], { type: "application/pdf" }), "vypiska.pdf"); data.append("type", "bank_statement"); data.append("info_request_id", ${JSON.stringify(docRequest.id)}); return fetch("/api/backend/applications/${escalation.id}/documents", { method: "POST", body: data }).then(r => r.status); })()`);
+  if (uploaded !== 201) throw new Error(`Document upload failed: ${uploaded}`);
+  const answered = await api(`/api/backend/applications/${escalation.id}/info-requests/${docRequest.id}/answer`, { message: "Выписка приложена" });
+  if (answered.status !== 200) throw new Error(`Info request answer failed: ${JSON.stringify(answered)}`);
+  if ((await api(`/api/backend/applications/${escalation.id}`)).data.status !== "analyst_escalation") throw new Error("Answered request did not return application to analyst");
+  console.log("Client uploaded the document and answered; application returned to analyst");
+
+  await login("/staff/login?role=analyst", [analystLogin, "demo-password"], "credit_analyst");
+  const files = (await api(`/api/backend/backoffice/applications/${escalation.id}`)).data.documents;
+  const download = await evaluate(`fetch("/api/backend/backoffice/applications/${escalation.id}/documents/${files[0]?.id}/content").then(r => r.status)`);
+  if (files.length !== 1 || download !== 200) throw new Error(`Analyst cannot download uploaded file: ${download}`);
+  await openEscalation();
   await click("Отправить заключение андеррайтеру");
   await wait("!!document.querySelector('textarea')");
   await evaluate("document.querySelector('textarea').value='Проверено на синтетических данных'; document.querySelector('input[type=radio]').click()");
