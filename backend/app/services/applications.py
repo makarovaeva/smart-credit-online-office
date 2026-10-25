@@ -4,13 +4,14 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
     Application,
     ApplicationConsent,
     ApplicationStatusHistory,
+    ChatMessage,
     CompanyMember,
     CreditDecision,
     CreditProduct,
@@ -187,6 +188,13 @@ async def create_application(
     )
     _clear_collateral_if_absent(application)
     session.add(application)
+    await session.flush()
+    # Диалог с ИИ-агентом до создания заявки (подбор параметров) становится её частью
+    await session.execute(
+        update(ChatMessage)
+        .where(ChatMessage.company_id == body.company_id, ChatMessage.application_id.is_(None))
+        .values(application_id=application.id)
+    )
     await session.commit()
     return application
 

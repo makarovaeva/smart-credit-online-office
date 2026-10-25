@@ -4,7 +4,7 @@ import { sameOrigin, serverApi } from "@/lib/server-api";
 type Context = { params: Promise<{ path: string[] }> };
 async function proxy(request: NextRequest, context: Context) {
   const { path } = await context.params;
-  if (!path.length || !["me", "products", "companies", "applications", "backoffice", "loans", "notifications"].includes(path[0]) || path.some(p => !/^[a-zA-Z0-9_-]+$/.test(p))) {
+  if (!path.length || !["me", "products", "companies", "applications", "chat", "backoffice", "loans", "notifications"].includes(path[0]) || path.some(p => !/^[a-zA-Z0-9_-]+$/.test(p))) {
     return NextResponse.json({ detail: "Неизвестный API-метод" }, { status: 404 });
   }
   if (request.method !== "GET" && !sameOrigin(request)) return NextResponse.json({ detail: "Недопустимый источник запроса" }, { status: 403 });

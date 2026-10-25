@@ -60,6 +60,10 @@ try {
   await login("/login", ["+7 999 000-00-01"], "client");
   await navigate("/chat");
   await wait("document.body.innerText.includes('Подтвердить и отправить заявку')");
+  await evaluate("(() => { const input = document.querySelector('input[aria-label=\"Сообщение\"]'); input.focus(); input.value = '3 млн на 2 года на пополнение оборотных средств'; input.dispatchEvent(new Event('input', { bubbles: true })); })()");
+  await click("Отправить");
+  await wait("!!document.querySelector('[data-chat-message=confirmation_card]') && document.querySelector('[data-chat-message=confirmation_card]').innerText.includes('Оборотный кредит') && !document.querySelector('[aria-busy=true]')");
+  console.log("AI agent parsed loan parameters in chat and suggested a product");
   await click("Подтвердить и отправить заявку");
   await wait("location.pathname === '/applications' && !document.querySelector('[aria-busy=true]')");
   const applications = await api("/api/backend/applications?limit=1"); application = applications.data.items[0];
@@ -67,6 +71,8 @@ try {
   const created = await api(`/api/backend/applications/${application.id}`);
   if (created.data.status !== "underwriter_review") throw new Error(`Unexpected actual status: ${JSON.stringify(created.data)}`);
   console.log(`Created and submitted real application ${application.id}`);
+  const dialog = await api(`/api/backend/chat/messages?company_id=${created.data.company_id}`);
+  if (!dialog.data.some(m => m.message_type === "confirmation_card" && m.reply_to_id)) throw new Error("Chat exchange was not saved");
 
   let found = false;
   for (const number of [1, 2]) {

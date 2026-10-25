@@ -7,6 +7,7 @@ from app.models.application import (
     PreApproval,
 )
 from app.models.assessment import CreditDecision, CreditMemo, ExternalCheck, ScoringResult
+from app.models.chat import ChatMessage
 from app.models.company import Company, CompanyMember, CompanyOwner
 from app.models.document import Document, InfoRequest
 from app.models.loan import LoanContract, PaymentScheduleItem
@@ -18,6 +19,7 @@ __all__ = [
     "Application",
     "ApplicationConsent",
     "ApplicationStatusHistory",
+    "ChatMessage",
     "Company",
     "CompanyMember",
     "CompanyOwner",

@@ -78,6 +78,7 @@ cd backend && uv run python -m scripts.export_openapi
 | POST | `/applications/{id}/offer/accept`, `/reject` | Принять / отказаться от оффера |
 | POST | `/applications/{id}/sign` | Подписание и выдача (симуляция): `e_sign → disbursement → completed` |
 | GET | `/applications/{id}/contract` | Кредитный договор и график платежей (после принятия оффера) |
+| GET/POST | `/chat/messages` | Диалог с ИИ-агентом (`company_id`, необязательный `application_id`). POST возвращает пару: сообщение клиента и ответ агента. Если из текста разобраны параметры кредита — `confirmation_card` с суммой, сроком, целью, залогом и продуктом. Ещё агент отвечает о статусе, документах, оффере, отказе и продуктах. `client_message_id` защищает от дублей, `generated_by`: `rules` или `llm:<модель>`. Агент сам пишет о дозапросе, оффере, отказе, договоре и зачислении |
 | GET | `/loans`, `/loans/{id}` | Раздел «Кредиты»: договоры с остатком долга, ближайшим платежом и графиком |
 | GET | `/notifications`, POST `/notifications/{id}/read` | Уведомления в кабинете |
 

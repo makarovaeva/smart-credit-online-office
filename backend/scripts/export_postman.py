@@ -218,6 +218,23 @@ def build_collection() -> dict[str, Any]:
             ],
         ),
         request(
+            "Клиент: ИИ-агенту - параметры кредита",
+            "POST",
+            "/chat/messages",
+            token="clientToken",
+            status=201,
+            body={
+                "company_id": "{{companyId}}",
+                "content": "Нужно 3 млн на 2 года на пополнение оборотных средств",
+            },
+            description="Агент разбирает сумму, срок и цель и возвращает карточку подтверждения "
+            "с подходящим продуктом. Заявку клиент создаёт обычными командами.",
+            tests=[
+                js_expect("pm.response.json().reply.message_type", "confirmation_card"),
+                js_expect("pm.response.json().reply.card_payload.fields.amount", "3000000.00"),
+            ],
+        ),
+        request(
             "Каталог продуктов",
             "GET",
             "/products",
@@ -363,6 +380,18 @@ def build_collection() -> dict[str, Any]:
             body={"confirmation_code": "123456"},
             description="Подпись, открытие ссудного счёта, зачисление на расчётный счёт.",
             tests=[js_expect("pm.response.json().status", "completed")],
+        ),
+        request(
+            "Клиент: сообщения агента по заявке",
+            "GET",
+            "/chat/messages",
+            token="clientToken",
+            query={"company_id": "{{companyId}}", "application_id": "{{applicationId}}"},
+            description="Агент сам пишет о событиях: оффер, договор на подпись, зачисление.",
+            tests=[
+                "pm.test('есть сообщение о зачислении', () => pm.expect(pm.response.json()"
+                ".map(m => m.content).join(' ')).to.include('Средства зачислены'));"
+            ],
         ),
         request(
             "Клиент: мои кредиты",

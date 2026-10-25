@@ -269,3 +269,19 @@ class PaymentStatus(StrEnum):
     SCHEDULED = "scheduled"
     PAID = "paid"
     OVERDUE = "overdue"
+
+
+class ChatSender(StrEnum):
+    CLIENT = "client"
+    AI_AGENT = "ai_agent"
+
+
+class ChatMessageType(StrEnum):
+    """Вид сообщения чата определяет отображение (формат Chat History из документа модели)."""
+
+    TEXT = "text"
+    # Карточка с параметрами заявки, которые агент разобрал из текста
+    CONFIRMATION_CARD = "confirmation_card"
+    DOCUMENT_REQUEST = "document_request"
+    STATUS_NOTIFICATION = "status_notification"
+    REJECTION_NOTICE = "rejection_notice"
