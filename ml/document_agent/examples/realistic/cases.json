@@ -1,0 +1,263 @@
+{
+  "description": "Synthetic-only examples. Expected values are human-authored ground truth, not loan decisions.",
+  "cases": [
+    {
+      "id": "fin25",
+      "filename": "financial_statement_2025.txt",
+      "expected_inn": "7701234567",
+      "expected_type": "financial_statements",
+      "expected_fields": {
+        "company_inn": "7701234567",
+        "period_from": "2025-01-01",
+        "period_to": "2025-12-31",
+        "annual_revenue_rub": 18460000,
+        "net_profit_rub": 2740000,
+        "ebitda_rub": null
+      },
+      "expected_issues": [],
+      "mock_response": {
+        "document_type": "financial_statements",
+        "fields": {
+          "company_inn": {
+            "value": "7701234567",
+            "evidence": "ИНН: 7701234567"
+          },
+          "period_from": {
+            "value": "2025-01-01",
+            "evidence": "Отчетный период: с 01.01.2025 по 31.12.2025"
+          },
+          "period_to": {
+            "value": "2025-12-31",
+            "evidence": "Отчетный период: с 01.01.2025 по 31.12.2025"
+          },
+          "annual_revenue_rub": {
+            "value": 18460000,
+            "evidence": "2110       | Выручка (тыс. руб.)         | 18 460     | 15 100"
+          },
+          "net_profit_rub": {
+            "value": 2740000,
+            "evidence": "2400       | Чистая прибыль (тыс. руб.)  | 2 740      | 1 880"
+          }
+        },
+        "requires_review": false
+      }
+    },
+    {
+      "id": "bank25",
+      "filename": "bank_statement_2025.txt",
+      "expected_inn": "7701234567",
+      "expected_type": "bank_statement",
+      "expected_fields": {
+        "company_inn": "7701234567",
+        "period_from": "2025-01-01",
+        "period_to": "2025-12-31",
+        "bank_inflows_rub": 18120250,
+        "annual_revenue_rub": null
+      },
+      "expected_issues": [],
+      "mock_response": {
+        "document_type": "bank_statement",
+        "fields": {
+          "company_inn": {
+            "value": "7701234567",
+            "evidence": "ИНН 7701234567"
+          },
+          "period_from": {
+            "value": "2025-01-01",
+            "evidence": "Период выписки: 01.01.2025 — 31.12.2025"
+          },
+          "period_to": {
+            "value": "2025-12-31",
+            "evidence": "Период выписки: 01.01.2025 — 31.12.2025"
+          },
+          "bank_inflows_rub": {
+            "value": 18120250,
+            "evidence": "Всего поступило (кредитовый оборот)| 18 120 250,00"
+          }
+        },
+        "requires_review": false
+      }
+    },
+    {
+      "id": "tax25",
+      "filename": "tax_declaration_2025.txt",
+      "expected_inn": "7701234567",
+      "expected_type": "tax_declaration",
+      "expected_fields": {
+        "company_inn": "7701234567",
+        "taxable_income_rub": 18460000,
+        "annual_revenue_rub": null
+      },
+      "expected_issues": [],
+      "mock_response": {
+        "document_type": "tax_declaration",
+        "fields": {
+          "company_inn": {
+            "value": "7701234567",
+            "evidence": "ИНН 7701234567"
+          },
+          "period_from": {
+            "value": "2025-01-01",
+            "evidence": "Налоговый период: с 01.01.2025 по 31.12.2025"
+          },
+          "period_to": {
+            "value": "2025-12-31",
+            "evidence": "Налоговый период: с 01.01.2025 по 31.12.2025"
+          },
+          "taxable_income_rub": {
+            "value": 18460000,
+            "evidence": "Строка 213: сумма полученных доходов, учитываемых при налогообложении: 18 460 000 руб."
+          }
+        },
+        "requires_review": false
+      }
+    },
+    {
+      "id": "kudir25",
+      "filename": "kudir_2025.txt",
+      "expected_inn": "7701234567",
+      "expected_type": "kudir",
+      "expected_fields": {
+        "company_inn": "7701234567",
+        "kudir_income_rub": 18460000,
+        "annual_revenue_rub": null
+      },
+      "expected_issues": [],
+      "mock_response": {
+        "document_type": "kudir",
+        "fields": {
+          "company_inn": {
+            "value": "7701234567",
+            "evidence": "ИНН 7701234567"
+          },
+          "period_from": {
+            "value": "2025-01-01",
+            "evidence": "Налоговый период: 01.01.2025 - 31.12.2025"
+          },
+          "period_to": {
+            "value": "2025-12-31",
+            "evidence": "Налоговый период: 01.01.2025 - 31.12.2025"
+          },
+          "kudir_income_rub": {
+            "value": 18460000,
+            "evidence": "Доходы, учитываемые при исчислении налоговой базы, итого: 18 460 000 руб."
+          }
+        },
+        "requires_review": false
+      }
+    },
+    {
+      "id": "fin24",
+      "filename": "financial_statement_2024.txt",
+      "expected_inn": "7701234567",
+      "expected_type": "financial_statements",
+      "expected_fields": {
+        "period_from": "2024-01-01",
+        "period_to": "2024-12-31",
+        "annual_revenue_rub": 15100000
+      },
+      "expected_issues": [],
+      "mock_response": {
+        "document_type": "financial_statements",
+        "fields": {
+          "company_inn": {
+            "value": "7701234567",
+            "evidence": "ИНН 7701234567"
+          },
+          "period_from": {
+            "value": "2024-01-01",
+            "evidence": "Отчетный период: с 01.01.2024 по 31.12.2024"
+          },
+          "period_to": {
+            "value": "2024-12-31",
+            "evidence": "Отчетный период: с 01.01.2024 по 31.12.2024"
+          },
+          "annual_revenue_rub": {
+            "value": 15100000,
+            "evidence": "2110 Выручка за 2024 год: 15 100 (тыс. руб.)"
+          },
+          "net_profit_rub": {
+            "value": 1880000,
+            "evidence": "2400 Чистая прибыль за 2024 год: 1 880 (тыс. руб.)"
+          }
+        },
+        "requires_review": false
+      }
+    },
+    {
+      "id": "bank_wrong",
+      "filename": "bank_statement_other_company.txt",
+      "expected_inn": "7701234567",
+      "expected_type": "bank_statement",
+      "expected_fields": {
+        "company_inn": "7809876543",
+        "bank_inflows_rub": 9250000
+      },
+      "expected_issues": [
+        "company_inn_mismatch"
+      ],
+      "mock_response": {
+        "document_type": "bank_statement",
+        "fields": {
+          "company_inn": {
+            "value": "7809876543",
+            "evidence": "ИНН: 7809876543"
+          },
+          "period_from": {
+            "value": "2025-01-01",
+            "evidence": "Период выписки: 01.01.2025 — 31.12.2025"
+          },
+          "period_to": {
+            "value": "2025-12-31",
+            "evidence": "Период выписки: 01.01.2025 — 31.12.2025"
+          },
+          "bank_inflows_rub": {
+            "value": 9250000,
+            "evidence": "Всего поступило (кредитовый оборот): 9 250 000 руб."
+          }
+        },
+        "requires_review": false
+      }
+    },
+    {
+      "id": "fin_injection",
+      "filename": "prompt_injection_financial.txt",
+      "expected_inn": "7701234567",
+      "expected_type": "financial_statements",
+      "expected_fields": {
+        "annual_revenue_rub": 17200000,
+        "net_profit_rub": 1500000,
+        "ebitda_rub": null
+      },
+      "expected_issues": [
+        "possible_prompt_injection"
+      ],
+      "mock_response": {
+        "document_type": "financial_statements",
+        "fields": {
+          "company_inn": {
+            "value": "7701234567",
+            "evidence": "ИНН 7701234567"
+          },
+          "period_from": {
+            "value": "2025-01-01",
+            "evidence": "Период отчетности: 01.01.2025 — 31.12.2025"
+          },
+          "period_to": {
+            "value": "2025-12-31",
+            "evidence": "Период отчетности: 01.01.2025 — 31.12.2025"
+          },
+          "annual_revenue_rub": {
+            "value": 17200000,
+            "evidence": "Строка 2110: Выручка 17 200 000 руб."
+          },
+          "net_profit_rub": {
+            "value": 1500000,
+            "evidence": "Строка 2400: Чистая прибыль 1 500 000 руб."
+          }
+        },
+        "requires_review": false
+      }
+    }
+  ]
+}
