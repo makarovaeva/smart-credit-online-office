@@ -367,7 +367,7 @@ def build_collection() -> dict[str, Any]:
     ]
 
     counter = [
-        *client_start("counter", "+7 999 000-00-02", "5000000.00"),
+        *client_start("counter", "+7 999 000-00-02", "5000000.00", term=24),
         employee_login(
             "Андеррайтер: вход", "counterUwToken", ("underwriter1", "underwriter2"), "counterAppId"
         ),
@@ -526,7 +526,8 @@ def build_collection() -> dict[str, Any]:
         ),
         folder(
             "2. Контр-предложение с вариантами",
-            "Клиент +7 999 000-00-02, 5 млн: пограничный риск, андеррайтер выбирает вариант.",
+            "Клиент +7 999 000-00-02, 5 млн на 24 мес.: пограничный риск по DSCR, андеррайтер "
+            "выбирает вариант.",
             counter,
         ),
         folder(

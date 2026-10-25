@@ -234,6 +234,8 @@ class CounterOfferScenario(StrEnum):
 
     AUTO_APPROVAL_LIMIT = "auto_approval_limit"
     TERM_EXTENSION = "term_extension"
+    # Больше не применяется: по доске от 23.10 Debt Burden только аналитический показатель.
+    # Значение оставлено, чтобы читались ранее сохранённые Credit Memo
     DEBT_BURDEN_AMOUNT_REDUCTION = "debt_burden_amount_reduction"
     LTV_AMOUNT_REDUCTION = "ltv_amount_reduction"
     RISK_PREMIUM = "risk_premium"

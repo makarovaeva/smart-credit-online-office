@@ -35,7 +35,6 @@ def scenarios(result) -> list[CounterOfferScenario]:
 def assert_green_terms(result) -> None:
     m = result.recommended_metrics
     assert m.dscr >= DEFAULT_THRESHOLDS.min_dscr
-    assert m.debt_burden <= DEFAULT_THRESHOLDS.max_debt_burden
     assert m.ltv is None or m.ltv <= DEFAULT_THRESHOLDS.max_ltv
 
 
@@ -76,21 +75,23 @@ def test_auto_approval_limit_is_lesser_of_5m_and_20_percent_revenue() -> None:
 
 
 def test_low_dscr_extends_term() -> None:
+    # DSCR 1,05: продление срока закрывает разрыв, сумма не режется
     result = evaluate(replace(GREEN, ebitda=D("2000000")))
     assert result.requested_metrics.dscr < DEFAULT_THRESHOLDS.min_dscr
-    # Debt Burden = 1 / DSCR, поэтому одного продления срока до <50% не хватает
-    assert scenarios(result) == [Scenario.TERM_EXTENSION, Scenario.DEBT_BURDEN_AMOUNT_REDUCTION]
-    assert GREEN.term_months < result.recommended_terms.term_months <= GREEN.max_term_months
+    assert scenarios(result) == [Scenario.TERM_EXTENSION]
+    assert result.recommended_terms.amount == GREEN.amount
+    assert result.recommended_terms.term_months == 40
     assert result.zone == RiskZone.GREEN
     assert_green_terms(result)
 
 
-def test_high_debt_burden_reduces_amount() -> None:
+def test_debt_burden_is_analytical_only() -> None:
+    """По доске от 23.10 Debt Burden считается, но в решениях не участвует."""
     result = evaluate(replace(GREEN, ebitda=D("3500000")))
-    assert scenarios(result) == [Scenario.DEBT_BURDEN_AMOUNT_REDUCTION]
-    assert result.recommended_terms.amount < GREEN.amount
-    assert result.recommended_terms.amount % 1000 == 0
-    assert_green_terms(result)
+    assert result.requested_metrics.debt_burden > D("0.5")
+    assert result.zone == RiskZone.GREEN
+    assert result.recommendation == AiRecommendation.APPROVE
+    assert result.adjustments == []
 
 
 def test_high_ltv_reduces_amount_and_escalates() -> None:
@@ -136,9 +137,9 @@ def test_escalation_is_not_decline() -> None:
     ]
 
 
-def test_unfixable_debt_burden_escalates() -> None:
-    # Действующие платежи уже съедают больше 50% EBITDA
-    result = evaluate(replace(GREEN, existing_annual_debt_service=D("3500000")))
+def test_unreachable_dscr_escalates() -> None:
+    # DSCR 0,9 - не стоп-фактор, но даже на 60 месяцах не дотягивает до 1,1
+    result = evaluate(replace(GREEN, ebitda=D("2000000"), existing_annual_debt_service=D("910000")))
     assert result.stop_factors == []
     assert result.zone == RiskZone.YELLOW
     assert EscalationReasonCode.NO_COUNTER_OFFER in result.escalation_reasons
@@ -157,29 +158,27 @@ def test_no_alternatives_when_requested_terms_pass() -> None:
     assert evaluate(GREEN).alternatives == []
 
 
-def test_longer_term_keeps_requested_amount() -> None:
-    result = evaluate(replace(GREEN, ebitda=D("3500000")))
-    # Последовательные сценарии политики режут сумму...
-    assert result.recommended_terms.amount < GREEN.amount
-    # ...а вариант «дольше срок» сохраняет её целиком
+def test_alternatives_structure() -> None:
+    result = evaluate(replace(GREEN, ebitda=D("2000000")))
     assert kinds(result) == [Kind.LONGER_TERM, Kind.LOWER_AMOUNT, Kind.MAX_TERM]
     longer, lower, max_term = result.alternatives
     assert longer.terms.amount == GREEN.amount
-    assert GREEN.term_months < longer.terms.term_months < GREEN.max_term_months
+    assert longer.terms == result.recommended_terms
     assert lower.terms.term_months == GREEN.term_months
+    assert lower.terms.amount < GREEN.amount
     assert max_term.terms.term_months == GREEN.max_term_months
     for offer in result.alternatives:
         assert offer.metrics.dscr >= DEFAULT_THRESHOLDS.min_dscr
-        assert offer.metrics.debt_burden <= DEFAULT_THRESHOLDS.max_debt_burden
         assert offer.terms.amount % 1000 == 0
         assert "мес." in offer.description
 
 
-def test_longest_term_gives_more_than_sequential_scenarios() -> None:
-    result = evaluate(replace(GREEN, ebitda=D("2000000")))
+def test_alternatives_when_full_amount_never_fits() -> None:
+    result = evaluate(replace(GREEN, ebitda=D("2000000"), existing_annual_debt_service=D("910000")))
     # Даже на максимальном сроке всю сумму не сохранить
     assert kinds(result) == [Kind.LOWER_AMOUNT, Kind.MAX_TERM]
-    assert result.alternatives[1].terms.amount > result.recommended_terms.amount
+    lower, max_term = result.alternatives
+    assert lower.terms.amount < max_term.terms.amount < GREEN.amount
 
 
 def test_alternatives_respect_hard_caps_and_premium() -> None:
@@ -194,10 +193,13 @@ def test_alternatives_respect_hard_caps_and_premium() -> None:
     assert Kind.LONGER_TERM not in kinds(ltv)
 
     premium = evaluate(
-        replace(GREEN, ebitda=D("3500000"), signals=RiskSignals(revenue_drop=D("0.25")))
+        replace(GREEN, ebitda=D("2000000"), signals=RiskSignals(revenue_drop=D("0.25")))
     )
+    assert premium.alternatives
     assert {o.terms.rate for o in premium.alternatives} == {D("20")}
 
 
-def test_no_alternatives_when_nothing_fits() -> None:
-    assert evaluate(replace(GREEN, existing_annual_debt_service=D("3500000"))).alternatives == []
+def test_no_alternatives_below_product_minimum() -> None:
+    # Проходящая сумма меньше минимума продукта - вариантов нет
+    tight = replace(GREEN, ebitda=D("2000000"), existing_annual_debt_service=D("910000"))
+    assert evaluate(replace(tight, min_amount=D("3000000"))).alternatives == []

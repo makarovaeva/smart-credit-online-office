@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -27,6 +28,10 @@ class Settings(BaseSettings):
     # Сервис инференса ML (ml/service); при недоступности скоринг откатывается на правила
     ml_service_url: str = "http://ml:8000"
     ml_timeout_seconds: float = 10.0
+
+    # Кто готовит договор после принятия оффера: auto - система сразу; analyst - кредитный
+    # аналитик командой POST /backoffice/applications/{id}/contract (как на доске от 23.10)
+    contract_preparation: Literal["auto", "analyst"] = "auto"
 
     # Срок действия оффера на доске не задан - открытый вопрос
     offer_validity_days: int = 30

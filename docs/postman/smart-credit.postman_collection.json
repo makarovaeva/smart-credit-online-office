@@ -869,7 +869,7 @@
     },
     {
       "name": "2. Контр-предложение с вариантами",
-      "description": "Клиент +7 999 000-00-02, 5 млн: пограничный риск, андеррайтер выбирает вариант.",
+      "description": "Клиент +7 999 000-00-02, 5 млн на 24 мес.: пограничный риск по DSCR, андеррайтер выбирает вариант.",
       "item": [
         {
           "name": "Клиент: вход по телефону",
@@ -975,7 +975,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"company_id\": \"{{counterCompanyId}}\",\n  \"product_id\": \"{{productId}}\",\n  \"requested_amount\": \"5000000.00\",\n  \"requested_term_months\": 36,\n  \"purpose\": \"working_capital\",\n  \"purpose_description\": \"Закупка товара под сезон\"\n}",
+              "raw": "{\n  \"company_id\": \"{{counterCompanyId}}\",\n  \"product_id\": \"{{productId}}\",\n  \"requested_amount\": \"5000000.00\",\n  \"requested_term_months\": 24,\n  \"purpose\": \"working_capital\",\n  \"purpose_description\": \"Закупка товара под сезон\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

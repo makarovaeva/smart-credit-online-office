@@ -44,11 +44,11 @@ def use_dataset(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *profiles: dict
     monkeypatch.setattr(get_settings(), "borrower_dataset_path", str(dataset))
 
 
-def policy_input(features, amount: str = "3000000") -> PolicyInput:
+def policy_input(features, amount: str = "3000000", term_months: int = 36) -> PolicyInput:
     v = features.values
     return PolicyInput(
         amount=Decimal(amount),
-        term_months=36,
+        term_months=term_months,
         base_rate=Decimal("18"),
         min_amount=Decimal("300000"),
         max_term_months=60,
@@ -203,7 +203,9 @@ async def test_escalation_and_premium_scenarios() -> None:
     assert drop.zone == RiskZone.GREEN
     assert [a.scenario for a in drop.adjustments] == ["risk_premium"]
 
-    borderline = evaluate(policy_input(features_of(await fetch_all("7701000018")), "5000000"))
+    borderline = evaluate(
+        policy_input(features_of(await fetch_all("7701000018")), "5000000", term_months=24)
+    )
     assert borderline.recommendation == AiRecommendation.COUNTER_OFFER
     assert any(o.terms.amount == Decimal("5000000") for o in borderline.alternatives)
 

@@ -27,7 +27,8 @@ from app.schemas.decision import (
     DecisionRead,
     UnderwriterDecisionRequest,
 )
-from app.services import backoffice, decisions
+from app.schemas.loan import LoanContractRead
+from app.services import backoffice, decisions, loans, offers
 from app.services.offers import to_decision_read
 
 router = APIRouter(
@@ -98,3 +99,14 @@ async def make_decision(
     declined -> closed."""
     decision = await decisions.make_decision(session, underwriter, application_id, body)
     return to_decision_read(decision)
+
+
+@router.post("/{application_id}/contract", responses=CONFLICT)
+async def prepare_contract(
+    application_id: uuid.UUID, analyst: CurrentAnalyst, session: SessionDep
+) -> LoanContractRead:
+    """Подготовка кредитного договора аналитиком после принятия оффера:
+    contract_generation -> e_sign. Нужна при CONTRACT_PREPARATION=analyst; в режиме auto
+    договор готовится сразу при принятии оффера. Повторный вызов возвращает тот же договор."""
+    contract = await offers.prepare_contract_by_analyst(session, analyst, application_id)
+    return await loans.to_contract_read(session, contract)

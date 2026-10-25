@@ -7,13 +7,16 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Application, CreditDecision, User
+from app.core.config import get_settings
+from app.models import Application, CreditDecision, LoanContract, User
 from app.models.enums import ActorType, ApplicationStatus, CloseReason, DecisionType, OfferResponse
 from app.schemas.decision import DecisionRead, OfferRead
 from app.services import loans
 from app.services.applications import get_client_application
 from app.services.credit_policy import monthly_payment
+from app.services.decisions import ensure_assignee, get_application_for_update
 from app.services.errors import ConflictError, NotFoundError
+from app.services.status_machine import ensure_transition
 from app.services.transitions import transition
 
 S = ApplicationStatus
@@ -85,17 +88,51 @@ async def accept_offer(session: AsyncSession, user: User, application_id: uuid.U
 
     if application.status == S.OFFER_ACCEPTED:
         await transition(session, application, S.CONTRACT_GENERATION, ActorType.SYSTEM)
-    if application.status == S.CONTRACT_GENERATION:
-        contract = await loans.prepare_contract(session, application, decision)
-        await transition(
-            session,
-            application,
-            S.E_SIGN,
-            ActorType.SYSTEM,
-            comment=f"Договор {contract.contract_number} подготовлен",
-        )
+    # В режиме analyst заявка ждёт кредитного аналитика на contract_generation
+    if (
+        application.status == S.CONTRACT_GENERATION
+        and get_settings().contract_preparation == "auto"
+    ):
+        await _prepare(session, application, decision, ActorType.SYSTEM)
     await session.commit()
     return application
+
+
+async def _prepare(
+    session: AsyncSession,
+    application: Application,
+    decision: CreditDecision,
+    actor: ActorType,
+    actor_id: uuid.UUID | None = None,
+) -> LoanContract:
+    contract = await loans.prepare_contract(session, application, decision)
+    await transition(
+        session,
+        application,
+        S.E_SIGN,
+        actor,
+        actor_id,
+        comment=f"Договор {contract.contract_number} подготовлен",
+    )
+    return contract
+
+
+async def prepare_contract_by_analyst(
+    session: AsyncSession, analyst: User, application_id: uuid.UUID
+) -> LoanContract:
+    """Кредитный аналитик готовит договор на условиях принятого оффера: contract_generation ->
+    e_sign. Повторный вызов после подготовки возвращает тот же договор."""
+    application = await get_application_for_update(session, application_id)
+    if application.status != S.CONTRACT_GENERATION:
+        contract = await loans.get_contract(session, application.id)
+        if contract is not None:
+            return contract
+    ensure_transition(application.status, S.E_SIGN, ActorType.CREDIT_ANALYST)
+    ensure_assignee(application, analyst)
+    decision = await _latest_offer(session, application.id)
+    contract = await _prepare(session, application, decision, ActorType.CREDIT_ANALYST, analyst.id)
+    await session.commit()
+    return contract
 
 
 async def reject_offer(

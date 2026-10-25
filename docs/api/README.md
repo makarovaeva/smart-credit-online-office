@@ -87,6 +87,7 @@ cd backend && uv run python -m scripts.export_openapi
 | GET | `/backoffice/applications/{id}` | аналитик, андеррайтер, админ | Карточка своей заявки: компания, учредители, проверки, метрики, скоринг, AI Credit Memo, решения, история |
 | POST | `/backoffice/applications/{id}/assign` | сотрудник этапа, админ | Передать заявку другому сотруднику той же роли |
 | POST | `/backoffice/applications/{id}/analyst-conclusion` | аналитик | Заключение: `analyst_escalation → analyst_completed → underwriter_review` |
+| POST | `/backoffice/applications/{id}/contract` | аналитик (исполнитель) | Подготовка договора: `contract_generation → e_sign`. Нужна при `CONTRACT_PREPARATION=analyst`, в режиме `auto` договор готовится сам |
 | POST | `/backoffice/applications/{id}/decision` | андеррайтер | Одно из 4 решений. `more_information_required` с `more_info_target`: `client` — дозапрос документов, `credit_analyst` — запрос экспертизы. `conditional_approval` с `alternative_offer` берёт условия варианта из AI Credit Memo |
 
 Этапы `data_collection`, `ai_*`, `decision_routing` (включая автоотказ по стоп-фактору), `contract_generation`, `disbursement` двигает конвейер, публичных эндпоинтов для них нет. Внешние источники (ЕГРЮЛ, ФНС, БКИ, комплаенс) — внутренние модули-моки на профилях заёмщиков (формат Borrower Profile из [`../credit_mmb_data_model_updated.md`](../credit_mmb_data_model_updated.md)) в `app/integrations/`, описаны в [`../external-sources.md`](../external-sources.md).
@@ -98,4 +99,4 @@ cd backend && uv run python -m scripts.export_openapi
 1. Числовой порог кредитного рейтинга.
 2. Лимит исполнительных производств.
 3. Срок действия оффера (`valid_until`).
-4. Расхождения на доске, по которым принято решение (см. [`../application-lifecycle.md`](../application-lifecycle.md#допущения-и-неопределённости)): лимит автоодобрения «ИЛИ» против «меньшая из величин», минимальный DSCR 1,1 против 1,2, Debt Burden = 1 / DSCR.
+4. Расхождения на доске, по которым принято решение (см. [`../application-lifecycle.md`](../application-lifecycle.md#допущения-и-неопределённости)): лимит автоодобрения «ИЛИ» против «меньшая из величин», минимальный DSCR 1,1 против 1,2.
