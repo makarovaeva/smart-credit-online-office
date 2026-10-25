@@ -338,7 +338,7 @@
           "companies"
         ],
         "summary": "Lookup Company",
-        "description": "Предзаполнение реквизитов по ИНН из (мока) ЕГРЮЛ/ЕГРИП.\nДемо-ИНН со сценариями - в docs/external-sources.md.",
+        "description": "Предзаполнение реквизитов, руководителя и учредителей по ИНН из (мока) ЕГРЮЛ/ЕГРИП.\nДемо-ИНН со сценариями - в docs/external-sources.md.",
         "operationId": "lookup_company_api_v1_companies_lookup_get",
         "security": [
           {
@@ -420,6 +420,7 @@
           "companies"
         ],
         "summary": "List My Companies",
+        "description": "Компании, от имени которых действует пользователь, с ролью в каждой.",
         "operationId": "list_my_companies_api_v1_companies_get",
         "responses": {
           "200": {
@@ -468,7 +469,7 @@
           "companies"
         ],
         "summary": "Create Company",
-        "description": "Привязать компанию к пользователю. Реквизиты берутся из реестра, а не из запроса.",
+        "description": "Привязать компанию к пользователю. Реквизиты берутся из реестра, а не из запроса.\nКомпания, уже обслуживаемая в банке, повторно не привязывается (409).",
         "operationId": "create_company_api_v1_companies_post",
         "requestBody": {
           "content": {
@@ -521,6 +522,16 @@
               }
             }
           },
+          "404": {
+            "description": "Объект не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -545,6 +556,7 @@
           "companies"
         ],
         "summary": "Get Company",
+        "description": "Профиль компании: организация, деятельность, руководитель и владельцы, право подписи,\nконтакты и расчётный счёт. Чужая компания - 404.",
         "operationId": "get_company_api_v1_companies__company_id__get",
         "security": [
           {
@@ -4967,6 +4979,49 @@
         ],
         "title": "CompanyCreate"
       },
+      "CompanyHead": {
+        "properties": {
+          "full_name": {
+            "type": "string",
+            "title": "Full Name"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          },
+          "in_position_since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "In Position Since"
+          },
+          "has_signing_authority": {
+            "type": "boolean",
+            "title": "Has Signing Authority"
+          }
+        },
+        "type": "object",
+        "required": [
+          "full_name",
+          "position",
+          "in_position_since",
+          "has_signing_authority"
+        ],
+        "title": "CompanyHead"
+      },
       "CompanyMemberRole": {
         "type": "string",
         "enum": [
@@ -5009,6 +5064,11 @@
           "is_beneficiary": {
             "type": "boolean",
             "title": "Is Beneficiary"
+          },
+          "has_signing_authority": {
+            "type": "boolean",
+            "title": "Has Signing Authority",
+            "default": false
           }
         },
         "type": "object",
@@ -5048,9 +5108,42 @@
             "type": "string",
             "title": "Name"
           },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
           "okved_main": {
             "type": "string",
             "title": "Okved Main"
+          },
+          "okved_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Okved Name"
+          },
+          "tax_system": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tax System"
           },
           "registration_date": {
             "type": "string",
@@ -5083,6 +5176,16 @@
             ],
             "title": "Employees Count"
           },
+          "head": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CompanyHead"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "owners": {
             "items": {
               "$ref": "#/components/schemas/CompanyOwnerRead"
@@ -5106,6 +5209,58 @@
               }
             ],
             "title": "Actual Address"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "settlement_account": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SettlementAccount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "signatories": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Signatories",
+            "description": "Кто вправе подписывать документы: руководитель и учредители",
+            "default": []
+          },
+          "member_role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CompanyMemberRole"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Роль текущего пользователя в компании (для клиента)"
           }
         },
         "type": "object",
@@ -5123,7 +5278,8 @@
           "id",
           "actual_address"
         ],
-        "title": "CompanyRead"
+        "title": "CompanyRead",
+        "description": "Профиль компании: реквизиты и владельцы из реестра, контакты и счёт - данные клиента\nбанка (указаны при открытии счёта)."
       },
       "CompanyRequisites": {
         "properties": {
@@ -5153,9 +5309,42 @@
             "type": "string",
             "title": "Name"
           },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
           "okved_main": {
             "type": "string",
             "title": "Okved Main"
+          },
+          "okved_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Okved Name"
+          },
+          "tax_system": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tax System"
           },
           "registration_date": {
             "type": "string",
@@ -5187,6 +5376,16 @@
               }
             ],
             "title": "Employees Count"
+          },
+          "head": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CompanyHead"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "owners": {
             "items": {
@@ -7176,6 +7375,43 @@
           "created_at"
         ],
         "title": "ScoringResultRead"
+      },
+      "SettlementAccount": {
+        "properties": {
+          "account_number": {
+            "type": "string",
+            "title": "Account Number"
+          },
+          "bik": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bik"
+          },
+          "bank_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bank Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "account_number",
+          "bik",
+          "bank_name"
+        ],
+        "title": "SettlementAccount"
       },
       "SignRequest": {
         "properties": {

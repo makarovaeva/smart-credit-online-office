@@ -16,7 +16,6 @@ from app.models import (
     ApplicationConsent,
     ApplicationStatusHistory,
     Company,
-    CompanyOwner,
     CreditDecision,
     CreditMemo,
     Document,
@@ -29,9 +28,9 @@ from app.models import (
 from app.models.enums import ApplicationStatus, RiskZone, UserRole
 from app.schemas.application import ConsentRead, PreApprovalRead, StatusHistoryItem
 from app.schemas.backoffice import BackofficeApplicationDetail, BackofficeApplicationItem
-from app.schemas.company import CompanyOwnerRead, CompanyRead
 from app.schemas.decision import CreditMemoRead, ExternalCheckRead, ScoringResultRead
 from app.schemas.document import DocumentRead, InfoRequestRead
+from app.services import companies
 from app.services.applications import to_read
 from app.services.assignment import STAGE_ROLES
 from app.services.errors import ConflictError, ForbiddenError, NotFoundError, ValidationFailedError
@@ -134,10 +133,7 @@ async def get_detail(
     application = await get_visible_application(session, user, application_id)
     company = await session.get(Company, application.company_id)
     assert company is not None
-    owners = await session.scalars(
-        select(CompanyOwner).where(CompanyOwner.company_id == company.id)
-    )
-    owners_read = [CompanyOwnerRead.model_validate(o) for o in owners]
+    company_read = await companies.to_read(session, company)
     pre_approvals = await _all(session, PreApproval, application.id)
     scorings = await _all(session, ScoringResult, application.id)
     memos = await _all(session, CreditMemo, application.id)
@@ -145,8 +141,8 @@ async def get_detail(
 
     return BackofficeApplicationDetail(
         application=await to_read(session, application),
-        company=CompanyRead.model_validate(_columns(company) | {"owners": owners_read}),
-        owners=owners_read,
+        company=company_read,
+        owners=company_read.owners,
         assignee_id=application.assignee_id,
         consents=[
             ConsentRead.model_validate(c)
