@@ -12,7 +12,7 @@ async function proxy(request: NextRequest, context: Context) {
     const headers = new Headers();
     const contentType = request.headers.get("content-type");
     if (contentType) headers.set("Content-Type", contentType);
-    const upstream = await serverApi(`/${path.join("/")}${new URL(request.url).search}`, {
+    const upstream = await serverApi(request, `/${path.join("/")}${new URL(request.url).search}`, {
       method: request.method, headers,
       body: request.method === "GET" ? undefined : await request.arrayBuffer(),
     });

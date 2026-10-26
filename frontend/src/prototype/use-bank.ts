@@ -21,6 +21,8 @@ export const homeScene = (application: ObjectData | null): ScreenName => {
     default: return Array.isArray(application.available_actions) && application.available_actions.includes("sign") ? "S4_Home.dc.html" : "S1_HomeSubmitted.dc.html";
   }
 };
+const PURPOSE_LABELS: Record<string, string> = { working_capital: "Пополнение оборотных средств", equipment: "Покупка оборудования", business_expansion: "Развитие бизнеса", refinancing: "Рефинансирование", other: "Другая цель" };
+const purposeCode = (label: string) => { const text = label.toLowerCase(); return text.includes("оборуд") ? "equipment" : text.includes("оборот") ? "working_capital" : text.includes("рефин") ? "refinancing" : text.includes("развит") ? "business_expansion" : "other"; };
 const selectionKey = "credit-selected-application";
 function storedId() { try { return sessionStorage.getItem(selectionKey); } catch { return null; } }
 function storeId(id: string | null) { try { if (id) sessionStorage.setItem(selectionKey, id); else sessionStorage.removeItem(selectionKey); } catch {} }
@@ -41,6 +43,7 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
   const latest = useRef(state); latest.current = state;
   const scene = useRef(name); scene.current = name;
   const sequence = useRef(0);
+  const syncedDraft = useRef<string | null>(null);
   const load: (selectedId?: string | null) => Promise<void> = useCallback(async (selectedId?: string | null) => {
     const requestId = ++sequence.current;
     const current = scene.current;
@@ -49,7 +52,12 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
       const user = await api("/api/session");
       const employee = user.role !== "client";
       const expected = current.startsWith("AD_") ? "admin" : current.startsWith("U_") ? "underwriter" : current.startsWith("A_") ? "credit_analyst" : "client";
-      if (user.role !== expected) { transition(loginScene(current), true); return; }
+      if (user.role !== expected) {
+        // Сессия одна на браузер: вход под другой ролью в соседней вкладке заменяет её
+        const roles: Record<string, string> = { client: "клиент", credit_analyst: "кредитный аналитик", underwriter: "андеррайтер", admin: "администратор" };
+        setState(previous => ({ ...previous, error: `В этом браузере выполнен вход под другой ролью: ${roles[str(user.role)] ?? str(user.role)}. Сессия общая для всех вкладок - войдите заново или используйте отдельное окно инкогнито для каждой роли.` }));
+        transition(loginScene(current), true); return;
+      }
       const applications = await collection(employee ? "/backoffice/applications" : "/applications");
       const urlId = current.startsWith("AD_") ? window.location.pathname.split("/").at(-1) : null;
       const requested = selectedId === undefined ? (urlId && /^[0-9a-f-]{36}$/.test(urlId) ? urlId : storedId()) : selectedId;
@@ -66,12 +74,14 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
         }
       }
       let products: ObjectData[] = []; let loans: ObjectData[] = []; let company: ObjectData | null = null;
-      let offer: ObjectData | null = null; let contract: ObjectData | null = null; let documents: ObjectData[] = []; let requests: ObjectData[] = []; let chat: ObjectData[] = [];
+      let offer: ObjectData | null = null; let contract: ObjectData | null = null; let documents: ObjectData[] = []; let requests: ObjectData[] = []; let chat: ObjectData[] = []; let preApproval: ObjectData | null = null; let employees: ObjectData[] = [];
       if (employee) {
         products = list(await optional("/products"));
         company = detail ? object(detail.company) : null;
         documents = list(detail?.documents); requests = list(detail?.info_requests); contract = detail?.contract ? object(detail.contract) : null;
         const decisions = list(detail?.decisions); offer = decisions.at(-1) ?? null;
+        // Список аналитиков для выбора исполнителя экспертизы
+        if (current === "U_Expertise.dc.html") employees = list(await optional("/backoffice/employees?role=credit_analyst"));
       } else {
         const values = await Promise.all([optional("/products"), optional("/loans")]);
         products = list(values[0]); loans = list(values[1]);
@@ -82,12 +92,18 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
         if (id) {
           if (application?.client_status === "approved" || application?.client_status === "counter_offer" || application?.status === "e_sign" || application?.client_status === "disbursed" || application?.client_status === "closed") {
             const value = await optional(`/applications/${id}/offer`); offer = value ? object(value) : null;
+            // Ставка предварительного расчёта - «было» в контр-предложении
+            if (application?.client_status === "counter_offer") { const pre = await optional(`/applications/${id}/pre-approval`); preApproval = pre ? object(pre) : null; }
           }
           if (["e_sign", "disbursement", "completed"].includes(str(application?.status))) {
             const value = await optional(`/applications/${id}/contract`); contract = value ? object(value) : null;
           }
-          if (current.includes("Docs")) documents = list(await optional(`/applications/${id}/documents`));
-          if (current.includes("MissingDocs")) requests = list(await optional(`/applications/${id}/info-requests`));
+          if (current.includes("Docs") || (current.includes("_Home") && (latest.current.detailsOpen || current.includes("HomeModal")))) documents = list(await optional(`/applications/${id}/documents`));
+          // Запросы банка и загруженные файлы - на любом экране, пока заявка ждёт документов
+          if (current.includes("MissingDocs") || application?.status === "need_additional_data") {
+            requests = list(await optional(`/applications/${id}/info-requests`));
+            if (!documents.length) documents = list(await optional(`/applications/${id}/documents`));
+          }
         }
         if (current.includes("Chat")) {
           // Диалог по выбранной заявке; при оформлении новой - сообщения до создания заявки
@@ -103,7 +119,12 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
         }
       }
       if (requestId !== sequence.current) return;
-      setState(previous => ({ ...previous, user, applications, application, detail, products, loans, company, offer, contract, documents, requests, chat, warnings, loading: false }));
+      // Черновик формы чата берёт условия выбранной редактируемой заявки (один раз на заявку)
+      if (!employee && application && ["draft", "pre_approved"].includes(str(application.status)) && syncedDraft.current !== application.id) {
+        syncedDraft.current = str(application.id);
+        setDraft(previous => ({ ...previous, amount: String(Math.round(Number(application.requested_amount))), term: Number(application.requested_term_months), purpose: PURPOSE_LABELS[str(application.purpose)] ?? previous.purpose, collateral: application.has_collateral ? "С залогом" : "Без залога" }));
+      }
+      setState(previous => ({ ...previous, user, applications, application, detail, products, loans, company, offer, contract, documents, requests, chat, preApproval, employees, warnings, loading: false }));
       if (!employee && current.includes("_Home") && !current.includes("Schedule") && !current.includes("Modal")) {
         const next = homeScene(application); if (next !== current) transition(next, true);
       }
@@ -112,7 +133,8 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
         if (current !== next) transition(next, true);
       }
       if (employee && current.startsWith("AD_Detail") && application) {
-        const next = application.status === "closed" ? "AD_DetailDeclined.dc.html" : "AD_DetailDone.dc.html";
+        // Экран автоотказа - только для автоотказа; прочие закрытые и активные - общая карточка
+        const next = application.close_reason === "auto_declined" ? "AD_DetailDeclined.dc.html" : "AD_DetailDone.dc.html";
         if (current !== next) transition(next, true);
       }
     } catch (error) {
@@ -120,11 +142,12 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
       if (error instanceof ApiError && error.status === 401) { setState(empty); transition(loginScene(current), true); }
       else setState(previous => ({ ...previous, loading: false, error: error instanceof Error ? error.message : "Не удалось загрузить данные" }));
     }
-  }, [transition, setState, drafting]);
+  }, [transition, setState, setDraft, drafting]);
 
   useEffect(() => {
     if (isLogin(name)) return;
-    setState(previous => ({ ...previous, loading: !previous.user }));
+    // Окно «Детали заявки» закрывается при переходе на другой экран
+    setState(previous => ({ ...previous, loading: !previous.user, detailsOpen: false }));
     void load();
     const timer = setInterval(() => { if (!document.hidden && !latest.current.busy && !document.activeElement?.matches("input, textarea, select")) void load(); }, 5_000);
     return () => { clearInterval(timer); ++sequence.current; };
@@ -142,8 +165,8 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
     setState(previous => ({ ...previous, busy: true, error: "" }));
     try {
       if (isLogin(current) && ["Войти", "Получить код"].includes(text)) {
-        await post("/api/session", current.startsWith("S") ? { kind: "client", phone: inputs[0]?.value } : { kind: "employee", email: inputs[0]?.value, password: inputs[1]?.value });
-        const user = await api("/api/session");
+        // Ответ входа - профиль: роль берётся из него, а не из страницы входа
+        const user = await post("/api/session", current.startsWith("S") ? { kind: "client", phone: inputs[0]?.value } : { kind: "employee", email: inputs[0]?.value, password: inputs[1]?.value });
         storeId(null); drafting.current = false; setState({ ...empty, user });
         transition(user.role === "admin" ? "AD_All.dc.html" : user.role === "underwriter" ? "U_Workspace.dc.html" : user.role === "credit_analyst" ? "A_Analyst.dc.html" : "S1_HomeEmpty.dc.html");
       } else if (text === "Выйти") {
@@ -164,8 +187,7 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
           const user = latest.current.user;
           const company = list(user?.companies)[0];
           const products = latest.current.products.length ? latest.current.products : await api<ObjectData[]>("/products");
-          const purposeText = draft.purpose.toLowerCase();
-          const purpose = purposeText.includes("оборуд") ? "equipment" : purposeText.includes("оборот") ? "working_capital" : purposeText.includes("рефин") ? "refinancing" : purposeText.includes("развит") ? "business_expansion" : "other";
+          const purpose = purposeCode(draft.purpose);
           if (!draft.collateral.toLowerCase().includes("без")) throw new Error("Для заявки с залогом нужны дополнительные поля. Эта форма пока поддерживает вариант без залога.");
           const product = products.find(p => Number(p.min_amount) <= Number(draft.amount) && Number(p.max_amount) >= Number(draft.amount) && Number(p.min_term_months) <= draft.term && Number(p.max_term_months) >= draft.term && !p.requires_collateral && Array.isArray(p.purposes) && p.purposes.includes(purpose));
           if (!company || !product) throw new Error("Нет подходящего продукта или компании для указанных условий");
@@ -174,9 +196,36 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
           storeId(str(application.id));
           setState(previous => ({ ...previous, application }));
         }
+        else if (application && (Number(application.requested_amount) !== Number(draft.amount) || Number(application.requested_term_months) !== draft.term || application.purpose !== purposeCode(draft.purpose))) {
+          // Клиент изменил параметры в чате - сначала сохраняем их в заявке
+          application = await api(`/applications/${application.id}`, { method: "PATCH", body: JSON.stringify({ requested_amount: draft.amount, requested_term_months: draft.term, purpose: purposeCode(draft.purpose), version: application.version }) });
+        }
+        if (!application) throw new Error("Заявка не создана");
         if (application.status === "draft") application = await post(`/applications/${application.id}/consents`, { types: ["bki", "fns", "digital_profile"] });
         if (application.status === "pre_approved") application = await post(`/applications/${application.id}/submit`);
         await load(str(application.id)); transition(homeScene(application));
+      } else if ((text === "Уточнить причину" || text === "Что можно исправить") && current.startsWith("S")) {
+        // Быстрые вопросы агенту после отказа - обычные сообщения чата
+        const companyId = app?.company_id ?? list(latest.current.user?.companies)[0]?.company_id;
+        if (!companyId) throw new Error("Нет компании для диалога");
+        await post("/chat/messages", { company_id: companyId, application_id: id, content: text === "Уточнить причину" ? "Почему отказ?" : "Что можно исправить?", client_message_id: crypto.randomUUID() });
+        await load(id);
+      } else if (text === "Посмотреть" && current.startsWith("S") && latest.current.contract) {
+        // Договор на подписание - PDF в новой вкладке
+        window.open(`/api/backend/applications/${str(latest.current.contract.application_id)}/contract/document`, "_blank", "noopener");
+      } else if (text === "График платежей" && current === "S4_CreditsSchedule.dc.html") {
+        // Окно графика уже открыто
+      } else if (text === "Спросить ИИ-агента" && current.startsWith("S")) {
+        // Чат по текущей заявке; в макетах это то ссылка, то кнопка без обработчика
+        setState(previous => ({ ...previous, detailsOpen: false }));
+        transition(app && !["draft", "pre_approved"].includes(str(app.status)) ? "S1_ChatSubmitted.dc.html" : "S1_Chat.dc.html");
+      } else if (text === "Детали заявки" && !current.startsWith("A") && !current.startsWith("U")) {
+        if (!id) throw new Error("Сначала выберите заявку");
+        latest.current = { ...latest.current, detailsOpen: true };
+        setState(previous => ({ ...previous, detailsOpen: true }));
+        await load(id);
+      } else if (text === "Закрыть" && latest.current.detailsOpen && root.querySelector("[data-close-details]")) {
+        setState(previous => ({ ...previous, detailsOpen: false }));
       } else if (text === "Принять оффер" || text === "Отклонить оффер" || text === "Подписать") {
         if (!id) throw new Error("Сначала выберите заявку");
         const result = await post(`/applications/${id}/${text === "Принять оффер" ? "offer/accept" : text === "Отклонить оффер" ? "offer/reject" : "sign"}`, text === "Подписать" ? { confirmation_code: "123456" } : {});
@@ -200,7 +249,8 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
             const text = (input.closest("label")?.textContent ?? input.parentElement?.textContent ?? "").toLowerCase();
             return text.includes("выпис") ? "bank_statement" : text.includes("кудир") ? "kudir" : text.includes("деклар") ? "tax_return" : text.includes("отч") ? "financial_statement" : "other";
           });
-          body = { decision_type: "more_information_required", more_info_target: text === "Отправить запрос" ? "client" : "credit_analyst", comment: textarea, ...(text === "Отправить запрос" ? { info_request: { message: textarea, requested_document_types: requestedTypes } } : {}) };
+          const analystId = root.querySelector<HTMLSelectElement>("select[data-analyst]")?.value || null;
+          body = { decision_type: "more_information_required", more_info_target: text === "Отправить запрос" ? "client" : "credit_analyst", comment: textarea, ...(text === "Отправить аналитику" && analystId ? { analyst_id: analystId } : {}), ...(text === "Отправить запрос" ? { info_request: { message: textarea, requested_document_types: requestedTypes } } : {}) };
         } else {
           const memo = object(latest.current.detail?.credit_memo);
           const preliminary = object(latest.current.detail?.pre_approval);
@@ -211,6 +261,16 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
           body = { decision_type: approve ? "approved" : "conditional_approval", approved_amount: approve ? app?.requested_amount : cleanAmount(inputs[0]?.value ?? ""), approved_term_months: approve ? app?.requested_term_months : Number(inputs[1]?.value), interest_rate: rate, comment: textarea, conditions: approve ? list(memo.recommended_conditions) : inputs[3]?.value ? [{ code: "security", description: inputs[3].value }] : [] };
         }
         await post(`/backoffice/applications/${id}/decision`, body); await load(id); transition("U_Workspace.dc.html");
+      } else if (text === "Отправить документы банку") {
+        if (!id) throw new Error("Сначала выберите заявку");
+        const open = latest.current.requests.filter(r => r.status === "open");
+        if (!open.length) throw new Error("Открытых запросов банка нет");
+        const input = root.querySelector<HTMLInputElement>('input[aria-label="Сообщение"]');
+        const message = input?.value.trim() || null;
+        for (const request of open) await post(`/applications/${id}/info-requests/${request.id}/answer`, { message });
+        if (input) input.value = "";
+        const updated = await api(`/applications/${id}`);
+        await load(id); transition(homeScene(updated));
       } else if (text === "Отправить" && current.includes("Chat") && root.querySelector<HTMLInputElement>('input[aria-label="Сообщение"]')?.value.trim()) {
         const input = root.querySelector<HTMLInputElement>('input[aria-label="Сообщение"]');
         const content = input?.value.trim() ?? "";
@@ -229,7 +289,8 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
         await post(`/applications/${id}/info-requests/${open[0].id}/answer`, { message: message || null }); await load(id);
       } else if (text === "Передать ИИ-агенту" && current === "A_RequestDocs.dc.html") {
         if (!id) throw new Error("Выберите заявку");
-        const checked = Array.from(root.querySelectorAll<HTMLInputElement>('input[type="checkbox"]:checked')).map(input => (input.closest("label")?.textContent ?? input.parentElement?.textContent ?? "").trim());
+        // Подписи пунктов без заглушек макета («за [период]» после привязки становится «за —»)
+        const checked = Array.from(root.querySelectorAll<HTMLInputElement>('input[type="checkbox"]:checked')).map(input => (input.closest("label")?.textContent ?? input.parentElement?.textContent ?? "").replace(/\s*(за|:)\s*—/g, "").trim());
         if (!checked.length && !textarea) throw new Error("Отметьте документы или напишите, что уточнить у клиента");
         const requestedTypes = [...new Set(checked.flatMap(label => {
           const lower = label.toLowerCase();
@@ -269,12 +330,12 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
         if (text === "Принять в работу" || text === "Вернуть с комментарием") transition("A_Analyst.dc.html");
       } else if (text === "Отправить") {
         throw new Error("Для этого действия ещё нет рабочего backend API. Запрос не отправлен.");
-      } else if (text === "Кредитный договор" || text.includes("Скачать график")) {
+      } else if (text === "Кредитный договор" || text === "Скачать договор" || text.includes("Скачать график")) {
         // Выгрузки backend: договор с графиком (PDF), график платежей (XLSX)
         const contractApp = str(latest.current.contract?.application_id ?? latest.current.loans.find(loan => loan.application_id === id)?.application_id ?? latest.current.loans[0]?.application_id ?? "");
         if (!contractApp) throw new Error("Договор ещё не подготовлен");
         const link = document.createElement("a");
-        link.href = `/api/backend/applications/${contractApp}/contract/${text === "Кредитный договор" ? "document" : "schedule-export?format=xlsx"}`;
+        link.href = `/api/backend/applications/${contractApp}/contract/${text.includes("график") ? "schedule-export?format=xlsx" : "document"}`;
         link.download = ""; document.body.append(link); link.click(); link.remove();
       } else if (text === "Скачать") {
         throw new Error("Выберите документ в списке. Скачивание доступно только для файлов, возвращённых API.");
@@ -284,17 +345,20 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
     return handled;
   }
 
-  async function upload(file: File) {
+  async function upload(file: File, requestedType?: string, requestId?: string) {
     const id = latest.current.application?.id;
     if (!id) return;
-    const answer = window.prompt("Тип документа: Выписка, Отчётность, КУДИР, Декларация, Другое", "Другое");
-    if (answer === null) return;
-    const types: Record<string, string> = { "выписка": "bank_statement", "отчётность": "financial_statement", "отчетность": "financial_statement", "кудир": "kudir", "декларация": "tax_return", "другое": "other" };
-    const type = types[answer.trim().toLowerCase()];
-    if (!type) { setState(previous => ({ ...previous, error: "Выберите допустимый тип документа" })); return; }
+    // Тип известен из запроса банка; без запроса (загрузка до подачи) - спрашиваем
+    let type = requestedType;
+    if (!type) {
+      const answer = window.prompt("Тип документа: Выписка, Отчётность, КУДИР, Декларация, Другое", "Другое");
+      if (answer === null) return;
+      const types: Record<string, string> = { "выписка": "bank_statement", "отчётность": "financial_statement", "отчетность": "financial_statement", "кудир": "kudir", "декларация": "tax_return", "другое": "other" };
+      type = types[answer.trim().toLowerCase()];
+      if (!type) { setState(previous => ({ ...previous, error: "Выберите допустимый тип документа" })); return; }
+    }
     const data = new FormData(); data.append("file", file); data.append("type", type);
-    const open = latest.current.requests.filter(r => r.status === "open");
-    if (open.length === 1) data.append("info_request_id", str(open[0].id));
+    if (requestId) data.append("info_request_id", requestId);
     setState(previous => ({ ...previous, busy: true, error: "" }));
     try { await api(`/applications/${id}/documents`, { method: "POST", body: data }); await load(str(id)); }
     catch (error) { setState(previous => ({ ...previous, error: error instanceof Error ? error.message : "Не удалось загрузить файл" })); }

@@ -180,4 +180,7 @@ class UnderwriterDecisionRequest(BaseModel):
     reasons: list[DecisionReason] = []
     more_info_target: MoreInfoTarget | None = None
     info_request: InfoRequestCreate | None = None
+    # Для запроса экспертизы: конкретный аналитик (список - GET /backoffice/employees);
+    # без него - прежний аналитик заявки или наименее загруженный
+    analyst_id: uuid.UUID | None = None
     comment: str | None = Field(default=None, max_length=2000)

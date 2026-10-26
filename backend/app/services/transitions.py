@@ -31,6 +31,7 @@ async def transition(
     *,
     comment: str | None = None,
     close_reason: CloseReason | None = None,
+    assignee_id: uuid.UUID | None = None,
 ) -> None:
     """Проверяет переход по машине состояний, пишет его в историю, назначает исполнителя
     этапа и сообщает клиенту в чат о важных событиях. Коммит - на вызывающем."""
@@ -53,6 +54,6 @@ async def transition(
         setattr(application, field, datetime.now(UTC))
     if close_reason is not None:
         application.close_reason = close_reason
-    await auto_assign(session, application)
+    await auto_assign(session, application, assignee_id)
     await chat_events.notify(session, application, comment)
     await session.flush()

@@ -7,10 +7,10 @@ export type BankState = {
   user: ObjectData | null; applications: ObjectData[]; application: ObjectData | null;
   detail: ObjectData | null; products: ObjectData[]; loans: ObjectData[];
   offer: ObjectData | null; contract: ObjectData | null; company: ObjectData | null;
-  documents: ObjectData[]; requests: ObjectData[]; chat: ObjectData[]; warnings: string[];
+  documents: ObjectData[]; requests: ObjectData[]; chat: ObjectData[]; preApproval: ObjectData | null; detailsOpen: boolean; employees: ObjectData[]; warnings: string[];
   loading: boolean; busy: boolean; error: string;
 };
-export const empty: BankState = { user: null, applications: [], application: null, detail: null, products: [], loans: [], offer: null, contract: null, company: null, documents: [], requests: [], chat: [], warnings: [], loading: false, busy: false, error: "" };
+export const empty: BankState = { user: null, applications: [], application: null, detail: null, products: [], loans: [], offer: null, contract: null, company: null, documents: [], requests: [], chat: [], preApproval: null, detailsOpen: false, employees: [], warnings: [], loading: false, busy: false, error: "" };
 
 function useBankStore() {
   const [state, setState] = useState<BankState>(empty);

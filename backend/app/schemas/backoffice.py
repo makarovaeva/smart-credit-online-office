@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from app.models.enums import InternalRequestStatus, RiskGrade, RiskZone
+from app.models.enums import InternalRequestStatus, RiskGrade, RiskZone, UserRole
 from app.schemas.application import (
     ApplicationRead,
     ApplicationShort,
@@ -71,6 +71,17 @@ class BackofficeApplicationDetail(BaseModel):
     internal_requests: list[InternalRequestRead]
     documents: list[DocumentRead]
     history: list[StatusHistoryItem]
+    staff: dict[uuid.UUID, str] = Field(
+        default={}, description="Имена сотрудников, упомянутых в карточке (исполнитель, решения)"
+    )
+
+
+class EmployeeRead(BaseModel):
+    id: uuid.UUID
+    full_name: str
+    role: UserRole
+    # Заявок сейчас в работе на этапе сотрудника
+    active_applications: int
 
 
 class AssignRequest(BaseModel):

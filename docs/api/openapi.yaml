@@ -3063,6 +3063,54 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/backoffice/employees:
+    get:
+      tags:
+      - backoffice
+      summary: List Employees
+      description: |-
+        Активные аналитики и андеррайтеры с числом заявок в работе - для выбора исполнителя
+        (аналитик для запроса экспертизы, коллега для передачи заявки).
+      operationId: list_employees_api_v1_backoffice_employees_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: role
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - $ref: '#/components/schemas/UserRole'
+          - type: 'null'
+          title: Role
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EmployeeRead'
+                title: Response List Employees Api V1 Backoffice Employees Get
+        '401':
+          description: Нет или невалидный токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
 components:
   schemas:
     ActorType:
@@ -3744,6 +3792,15 @@ components:
             $ref: '#/components/schemas/StatusHistoryItem'
           type: array
           title: History
+        staff:
+          additionalProperties:
+            type: string
+          propertyNames:
+            format: uuid
+          type: object
+          title: Staff
+          description: Имена сотрудников, упомянутых в карточке (исполнитель, решения)
+          default: {}
       type: object
       required:
       - application
@@ -4748,6 +4805,27 @@ components:
       - credit_agreement
       - other
       title: DocumentType
+    EmployeeRead:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        full_name:
+          type: string
+          title: Full Name
+        role:
+          $ref: '#/components/schemas/UserRole'
+        active_applications:
+          type: integer
+          title: Active Applications
+      type: object
+      required:
+      - id
+      - full_name
+      - role
+      - active_applications
+      title: EmployeeRead
     ErrorResponse:
       properties:
         detail:
@@ -5955,6 +6033,12 @@ components:
           anyOf:
           - $ref: '#/components/schemas/InfoRequestCreate'
           - type: 'null'
+        analyst_id:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Analyst Id
         comment:
           anyOf:
           - type: string

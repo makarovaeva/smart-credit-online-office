@@ -25,3 +25,4 @@ for module in (
     backoffice,
 ):
     api_router.include_router(module.router)
+api_router.include_router(backoffice.employees_router)

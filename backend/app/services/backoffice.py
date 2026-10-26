@@ -37,6 +37,7 @@ from app.schemas.application import ConsentRead, PreApprovalRead, StatusHistoryI
 from app.schemas.backoffice import (
     BackofficeApplicationDetail,
     BackofficeApplicationItem,
+    EmployeeRead,
     InternalRequestRead,
 )
 from app.schemas.decision import CreditMemoRead, ExternalCheckRead, ScoringResultRead
@@ -165,6 +166,9 @@ async def get_detail(
     company = await session.get(Company, application.company_id)
     assert company is not None
     company_read = await companies.to_read(session, company)
+    history = await _all(session, ApplicationStatusHistory, application.id)
+    decisions = await _all(session, CreditDecision, application.id)
+    requests = await _all(session, InternalRequest, application.id)
     pre_approvals = await _all(session, PreApproval, application.id)
     scorings = await _all(session, ScoringResult, application.id)
     memos = await _all(session, CreditMemo, application.id)
@@ -186,26 +190,58 @@ async def get_detail(
         ],
         scoring=ScoringResultRead.model_validate(scorings[-1]) if scorings else None,
         credit_memo=CreditMemoRead.model_validate(memos[-1]) if memos else None,
-        decisions=[
-            to_decision_read(d) for d in await _all(session, CreditDecision, application.id)
-        ],
+        decisions=[to_decision_read(d) for d in decisions],
         contract=await to_contract_read(session, contract) if contract else None,
         info_requests=[
             InfoRequestRead.model_validate(r)
             for r in await _all(session, InfoRequest, application.id)
         ],
-        internal_requests=[
-            InternalRequestRead.model_validate(r)
-            for r in await _all(session, InternalRequest, application.id)
-        ],
+        internal_requests=[InternalRequestRead.model_validate(r) for r in requests],
         documents=[
             DocumentRead.model_validate(d) for d in await _all(session, Document, application.id)
         ],
-        history=[
-            StatusHistoryItem.model_validate(h)
-            for h in await _all(session, ApplicationStatusHistory, application.id)
-        ],
+        history=[StatusHistoryItem.model_validate(h) for h in history],
+        staff=await _staff_names(
+            session,
+            [application.assignee_id]
+            + [h.actor_id for h in history]
+            + [d.decided_by_id for d in decisions]
+            + [m.analyst_id for m in memos]
+            + [r.from_user_id for r in requests]
+            + [r.accepted_by_id for r in requests],
+        ),
     )
+
+
+async def _staff_names(
+    session: AsyncSession, user_ids: list[uuid.UUID | None]
+) -> dict[uuid.UUID, str]:
+    ids = {i for i in user_ids if i is not None}
+    if not ids:
+        return {}
+    rows = await session.execute(
+        select(User.id, User.full_name).where(User.id.in_(ids), User.role != UserRole.CLIENT)
+    )
+    return {user_id: name for user_id, name in rows}
+
+
+async def list_employees(session: AsyncSession, role: UserRole | None) -> list[EmployeeRead]:
+    """Активные сотрудники с текущей загрузкой - для выбора исполнителя."""
+    load = (
+        select(func.count(Application.id))
+        .where(Application.assignee_id == User.id, Application.status.in_(list(STAGE_ROLES)))
+        .scalar_subquery()
+    )
+    query = select(User, load).where(
+        User.is_active, User.role.in_([UserRole.CREDIT_ANALYST, UserRole.UNDERWRITER])
+    )
+    if role is not None:
+        query = query.where(User.role == role)
+    rows = await session.execute(query.order_by(User.role, load, User.full_name))
+    return [
+        EmployeeRead(id=u.id, full_name=u.full_name, role=u.role, active_applications=count)
+        for u, count in rows
+    ]
 
 
 async def reassign(

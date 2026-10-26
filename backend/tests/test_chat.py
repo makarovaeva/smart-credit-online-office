@@ -125,6 +125,11 @@ async def test_status_and_auto_decline_in_chat(
     ]
     assert reply["message_type"] == "rejection_notice"
     assert "банкротство" in reply["content"].lower()
+    advice = (
+        await send(api, client_user, company_id, "Что можно исправить?", application_id=app_id)
+    )["reply"]
+    assert "Что можно сделать" in advice["content"]
+    assert "банкротства" in advice["content"]
     status = (await send(api, client_user, company_id, "Что с заявкой?", application_id=app_id))[
         "reply"
     ]

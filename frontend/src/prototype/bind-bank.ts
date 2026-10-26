@@ -10,9 +10,10 @@ export const money = (value: unknown) => {
 };
 const date = (value: unknown) => value ? new Date(String(value)).toLocaleDateString("ru-RU") : "—";
 const statuses: Record<string, string> = { draft: "Черновик", pre_approved: "Предварительное одобрение", underwriter_review: "Рассмотрение", analyst_escalation: "Эскалация аналитику", analyst_completed: "Заключение готово", need_additional_data: "Нужны документы", offer_generated: "Оффер сформирован", e_sign: "Договор на подписание", disbursement: "Выдача средств", completed: "Кредит выдан", closed: "Заявка закрыта" };
-Object.assign(statuses, { data_collection: "Сбор данных", submitted: "Заявка отправлена", ai_verification: "Проверка документов", ai_financial_analysis: "Финансовый анализ", ai_risk_scoring: "Оценка риска", decision_routing: "Маршрутизация заявки", offer_accepted: "Оффер принят", offer_rejected: "Оффер отклонён", contract_generation: "Подготовка договора", approved: "Одобрено", conditional_approval: "Одобрено с изменениями", declined: "Отказано", accepted: "Принят", rejected: "Отклонён", active: "Действует", green: "Зелёная зона", yellow: "Жёлтая зона", red: "Красная зона" });
+Object.assign(statuses, { data_collection: "Сбор данных", submitted: "Заявка отправлена", ai_verification: "Проверка документов", ai_financial_analysis: "Финансовый анализ", ai_risk_scoring: "Оценка риска", decision_routing: "Маршрутизация заявки", offer_accepted: "Оффер принят", offer_rejected: "Оффер отклонён", contract_generation: "Подготовка договора", approved: "Одобрено", conditional_approval: "Одобрено с изменениями", declined: "Отказано", more_information_required: "Запрошены данные", accepted: "Принят", rejected: "Отклонён", active: "Действует", green: "Зелёная зона", yellow: "Жёлтая зона", red: "Красная зона" });
 const legalForms: Record<string, string> = { ooo: "ООО", ip: "ИП" };
 const taxSystems: Record<string, string> = { usn_income: "УСН «Доходы»", usn_income_expense: "УСН «Доходы минус расходы»", osno: "ОСНО", psn: "Патент", eshn: "ЕСХН" };
+const DOCUMENT_LABELS: Record<string, string> = { bank_statement: "Выписка по расчётному счёту за 12 месяцев", tax_return: "Налоговая декларация", kudir: "КУДИР", financial_statement: "Бухгалтерская отчётность", management_report: "Управленческая отчётность", contract: "Договор с контрагентом", egrn_extract: "Выписка из ЕГРН на залог", vehicle_passport: "ПТС транспортного средства", equipment_documents: "Документы на оборудование", appraisal_report: "Отчёт об оценке залога", credit_agreement: "Кредитный договор", other: "Другой документ" };
 export const statusLabel = (value: unknown) => statuses[str(value)] ?? str(value);
 const terminal = (a: ObjectData) => ["closed", "completed"].includes(str(a.status));
 
@@ -104,15 +105,21 @@ export function bindBank(html: string, name: string, bank: BankState & { draft: 
   });
   const fields: Record<string, unknown> = {
     "Сумма": money((displayedOffer ? offer.approved_amount : app.requested_amount) ?? bank.draft.amount), "Сумма кредита": money(loan.principal_amount),
-    "Срок": `${str((displayedOffer ? offer.approved_term_months : app.requested_term_months) ?? bank.draft.term)} мес.`, "Ставка": offer.interest_rate ? `${offer.interest_rate}% годовых` : loan.interest_rate ? `${loan.interest_rate}% годовых` : estimatedRate ? `${estimatedRate}% годовых` : "—",
+    "Срок": `${str((displayedOffer ? offer.approved_term_months : app.requested_term_months) ?? bank.draft.term)} мес.`, "Ставка": [offer.interest_rate, loan.interest_rate, estimatedRate].find(v => v !== undefined && v !== null) !== undefined ? `${Number([offer.interest_rate, loan.interest_rate, estimatedRate].find(v => v !== undefined && v !== null)).toFixed(2).replace(".", ",")}% годовых` : "—",
     "Ежемесячный платёж": money(offer.estimated_monthly_payment ?? loan.monthly_payment),
     "Остаток долга": money(loan.outstanding_balance), "Ближайший платёж": object(loan.next_payment).total_amount ? `${money(object(loan.next_payment).total_amount)} · ${date(object(loan.next_payment).due_date)}` : "—",
     "Полное наименование": company.full_name ?? company.name, "Организационно-правовая форма": legalForms[str(company.legal_form)] ?? company.legal_form, "ИНН": company.inn, "КПП": company.kpp ?? "—", "ОГРН / ОГРНИП": company.ogrn,
     "Дата регистрации": date(company.registration_date), "Основной ОКВЭД": company.okved_name ? `${str(company.okved_main)} · ${str(company.okved_name)}` : company.okved_main, "Система налогообложения": taxSystems[str(company.tax_system)] ?? company.tax_system ?? "—", "Регион ведения бизнеса": company.region, "Число сотрудников": company.employees_count, "Юридический адрес": company.legal_address,
     "Руководитель": object(company.head).full_name ?? "—", "Должность": object(company.head).position ?? "—",
     "Бенефициарные владельцы": list(company.owners).filter(o => o.is_beneficiary).map(o => o.share_percent ? `${str(o.full_name)}, ${Number(o.share_percent)}%` : str(o.full_name)).join("; ") || "—",
-    "Право подписи": list(company.signatories).map(str).join(", ") || "—", "Телефон": company.phone ?? "—", "Электронная почта": company.email ?? "—",
-    "Расчётный счёт": object(company.settlement_account).account_number ? `${str(object(company.settlement_account).account_number)} · ${str(object(company.settlement_account).bank_name)}` : "—",
+    "Право подписи": (Array.isArray(company.signatories) ? company.signatories.map(String) : []).join(", ") || "—", "Телефон": company.phone ?? "—", "Электронная почта": company.email ?? "—",
+    // Экран выдачи - счёт зачисления по договору, профиль компании - расчётный счёт компании
+    "Расчётный счёт": loan.settlement_account_number && name.includes("_Home") ? loan.settlement_account_number : object(company.settlement_account).account_number ? `${str(object(company.settlement_account).account_number)} · ${str(object(company.settlement_account).bank_name)}` : "—",
+    "Сумма зачисления": money(loan.principal_amount),
+    "Тип платежа": loan.contract_number ? "Аннуитетный, ежемесячно" : "—",
+    // Досрочного погашения в прототипе нет - не обещаем условий, которых нет
+    "Досрочное погашение": loan.contract_number ? "Не поддерживается в прототипе" : "—",
+    "Дата и время": loan.disbursed_at ? new Date(String(loan.disbursed_at)).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" }) : "—",
     "DSCR": scoring.dscr, "Debt Burden (аналитический)": scoring.debt_burden ? `${(Number(scoring.debt_burden) * 100).toFixed(2)}%` : "—", "LTV": scoring.ltv === undefined || scoring.ltv === null ? "—" : `${(Number(scoring.ltv) * 100).toFixed(2)}%`,
     "Риск-грейд": scoring.risk_grade, "Уверенность модели": scoring.confidence !== undefined ? `${Number(scoring.confidence) * 100}%` : "—",
     "Стоп-факторы": list(scoring.stop_factors).map(f => str(f.description)).join(", ") || "—",
@@ -145,14 +152,236 @@ export function bindBank(html: string, name: string, bank: BankState & { draft: 
     const info = list(detail.info_requests).filter(r => r.status === "open").at(-1);
     if (expertise) value = value.replace(/\[(Текст вопроса для экспертизы|текст вопроса)\]/g, str(expertise.message));
     if (info) value = value.replace("[перечень документов]", str(info.message));
+    if (loan.contract_number) {
+      const loanApp = bank.applications.find(a => a.id === loan.application_id);
+      const productName = bank.products.find(p => p.id === (loanApp ?? app).product_id)?.name;
+      value = value.replace("Кредит на развитие", str(productName ?? "Кредит")).replace("[номер договора]", str(loan.contract_number)).replace("[дата выдачи]", date(loan.disbursed_at));
+    }
     value = value.replace(/\[[^\]]+\]/g, "—");
     text.textContent = value;
+  }
+
+  // Блок «Параметры заявки» в чате: заявка в работе - её условия («Подтверждено вами»),
+  // иначе - черновик, который заполняет карточка ИИ-агента и подтверждает клиент
+  if (!employee && name.includes("Chat") && !name.includes("ChatEdit")) {
+    // Блок с параметрами - сообщение макета со строкой «Сумма» (до вставки истории чата)
+    const block = Array.from(doc.querySelectorAll("main > section > div")).find(div => Array.from(div.querySelectorAll("span.t")).some(label => label.textContent?.trim() === "Сумма"));
+    if (block) {
+      const inWork = !!app.id && !["draft", "pre_approved", "completed", "closed"].includes(str(app.status));
+      const purposes: Record<string, string> = { working_capital: "Пополнение оборотных средств", equipment: "Покупка оборудования", business_expansion: "Развитие бизнеса", refinancing: "Рефинансирование", other: "Другая цель" };
+      const values: Record<string, string> = inWork
+        ? { "Сумма": money(app.requested_amount), "Срок": `${str(app.requested_term_months)} мес.`, "Цель": purposes[str(app.purpose)] ?? str(app.purpose), "Залог": app.has_collateral ? "С залогом" : "Без залога" }
+        : { "Сумма": money(bank.draft.amount), "Срок": `${bank.draft.term} мес.`, "Цель": bank.draft.purpose, "Залог": bank.draft.collateral };
+      for (const label of Array.from(block.querySelectorAll(".t"))) {
+        const key = label.textContent?.trim() ?? "";
+        if (key in values && label.nextElementSibling) label.nextElementSibling.textContent = values[key];
+        if (key === "Подтверждено вами" && !inWork) label.textContent = "Проверьте параметры и нажмите «Подтвердить и отправить заявку»";
+      }
+      // В вариантах экрана после подачи кнопки нет - для нового черновика она нужна
+      if (!inWork && !Array.from(block.querySelectorAll("a, button")).some(el => el.textContent?.trim() === "Подтвердить и отправить заявку")) {
+        const confirm = doc.createElement("button"); confirm.className = "bt"; confirm.style.cssText = "align-self:flex-start;margin-top:8px"; confirm.textContent = "Подтвердить и отправить заявку";
+        (block.querySelector("div") ?? block).append(confirm);
+      }
+    }
+  }
+
+  // Выход для клиента: в макетах клиента кнопки нет, у сотрудников она в шапке
+  const nav = doc.querySelector("aside.nav");
+  if (!employee && nav && bank.user) {
+    const footer = doc.createElement("div"); footer.style.cssText = "margin-top:24px;padding:16px;border-top:1px solid #eceef0;display:flex;flex-direction:column;gap:8px";
+    const who = doc.createElement("p"); who.className = "t"; who.textContent = `${str(bank.user.full_name)} · ${str(companyName)}`;
+    const logout = doc.createElement("a"); logout.href = "#"; logout.textContent = "Выйти"; logout.style.cssText = "color:#d92d20;font-weight:600;text-decoration:none;padding:0";
+    footer.append(who, logout); nav.append(footer);
+  }
+
+  // Панель «Статус заявки» в чате: реальный этап выбранной заявки, без заявки - черновик
+  if (!employee && name.includes("Chat")) {
+    const panel = Array.from(doc.querySelectorAll("aside")).find(aside => aside.querySelector("h3")?.textContent?.includes("Статус заявки"));
+    if (panel) {
+      const status = str(app.status);
+      const current: Record<string, number> = {
+        submitted: 2, ai_verification: 2, need_additional_data: 2,
+        ai_risk_scoring: 3, decision_routing: 3, ai_financial_analysis: 3, analyst_escalation: 3, analyst_completed: 3, underwriter_review: 3,
+        offer_generated: 4, offer_accepted: 5, contract_generation: 5, e_sign: 5, disbursement: 6, completed: 7,
+      };
+      // Закрытая заявка: на каком этапе остановилась
+      const stopped: Record<string, number> = { auto_declined: 3, underwriter_declined: 3, offer_rejected: 4 };
+      const closed = status === "closed";
+      const step = closed ? stopped[str(app.close_reason)] ?? 0 : current[status] ?? 0;
+      const chips: Record<string, [string, string]> = {
+        created: ["Заявка отправлена", "wr"], under_review: ["Заявка на рассмотрении", "wr"], documents_required: ["Нужны документы", "er"],
+        approved: ["Одобрено", "ok"], counter_offer: ["Контр-предложение", "wr"], signed: ["Договор подписан", "ok"], disbursed: ["Кредит выдан", "ok"], closed: ["Заявка закрыта", "er"],
+      };
+      const [chipText, chipKind] = app.id ? chips[str(app.client_status)] ?? ["Заявка не отправлена", "in"] : ["Заявка не отправлена", "in"];
+      const chip = panel.querySelector("span.chip");
+      if (chip) { chip.textContent = chipText; chip.className = `chip ${chipKind}`; }
+      const terms = panel.querySelector(":scope > p.t");
+      if (terms) terms.textContent = app.id ? `${money(app.requested_amount)} · ${str(app.requested_term_months)} мес.` : `${money(bank.draft.amount)} · ${bank.draft.term} мес.`;
+      Array.from(panel.querySelectorAll(":scope > div > p")).forEach((row, index) => {
+        const no = index + 1; const dot = row.querySelector("span") as HTMLElement | null;
+        const done = no < step || step === 7; const active = no === step && step !== 7;
+        row.className = done || active ? "" : "t"; (row as HTMLElement).style.fontWeight = active ? "700" : "";
+        if (dot) dot.style.background = active ? (closed ? "#d92d20" : "#f5b800") : done ? "#0a6b3a" : "#d5d9de";
+      });
+    }
+  }
+
+  // «Детали заявки»: окно на любом экране заявки клиента (в макете есть только после оффера)
+  if (!employee && name.includes("_Home") && app.id) {
+    const purposes: Record<string, string> = { working_capital: "Пополнение оборотных средств", equipment: "Покупка оборудования", business_expansion: "Развитие бизнеса", refinancing: "Рефинансирование", other: "Другая цель" };
+    const decided = ["approved", "conditional_approval"].includes(str(offer.decision_type));
+    const rateText = (value: unknown) => `${Number(value).toFixed(2).replace(".", ",")}% годовых`;
+    const payment = offer.estimated_monthly_payment ?? bank.contract?.monthly_payment;
+    const decision = decided ? statusLabel(offer.decision_type)
+      : app.close_reason === "auto_declined" || app.close_reason === "underwriter_declined" ? "Отказано"
+      : app.status === "closed" ? "Заявка закрыта" : "Ещё не принято";
+    const offerState = offer.client_response === "accepted" ? "Принят вами" : offer.client_response === "rejected" ? "Отклонён вами"
+      : app.status === "offer_generated" ? "Ожидает вашего ответа" : "—";
+    const documents = bank.documents.map(d => str(d.file_name));
+    const details: [string, string][] = [
+      ["Статус", str(app.status_description ?? statusLabel(app.status))],
+      ["Дата подачи", date(app.submitted_at)],
+      ["Сумма", money(decided ? offer.approved_amount : app.requested_amount)],
+      ["Срок", `${str(decided ? offer.approved_term_months : app.requested_term_months)} мес.`],
+      ["Цель", purposes[str(app.purpose)] ?? str(app.purpose)],
+      ["Обеспечение", app.has_collateral ? str(app.collateral_description ?? "Залог") : list(offer.conditions).map(c => str(c.description)).join(", ") || "Без залога"],
+      ["Ставка по офферу", decided ? rateText(offer.interest_rate) : "Появится после решения банка"],
+      ["Ориентировочный платёж", payment ? `${money(payment)} в месяц` : "—"],
+      ["Решение банка", decision],
+      ["Оффер", offerState],
+      ["Поданные документы", documents.join(", ") || "Не загружались"],
+      ["Способ подписания", bank.contract?.signed_at ? `Электронная подпись, ${date(bank.contract.signed_at)}` : "Электронная подпись (код подтверждения)"],
+    ];
+    const fill = (grid: Element) => {
+      grid.replaceChildren();
+      for (const [label, value] of details) {
+        const cell = doc.createElement("div"); const caption = doc.createElement("p"); caption.className = "t"; caption.textContent = label;
+        const text = doc.createElement("p"); text.style.cssText = "font-weight:600;margin-top:2px"; text.textContent = value; cell.append(caption, text); grid.append(cell);
+      }
+    };
+    const existing = doc.querySelector('[role="dialog"][aria-label="Детали заявки"]');
+    if (existing) { const grid = existing.querySelector("div[style*='grid']"); if (grid) fill(grid); }
+    else if (bank.detailsOpen) {
+      const overlay = doc.createElement("div"); overlay.style.cssText = "position:fixed;inset:0;background:rgba(11,31,53,.55);display:flex;align-items:center;justify-content:center;z-index:50";
+      const dialog = doc.createElement("div"); dialog.setAttribute("role", "dialog"); dialog.setAttribute("aria-label", "Детали заявки"); dialog.style.cssText = "width:680px;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);overflow:auto;background:#fff;border-radius:20px;padding:32px;display:flex;flex-direction:column;gap:20px";
+      const head = doc.createElement("div"); head.style.cssText = "display:flex;justify-content:space-between;align-items:center";
+      const title = doc.createElement("h2"); title.style.fontSize = "22px"; title.textContent = `Детали заявки №${str(app.number)}`;
+      const close = doc.createElement("button"); close.className = "bs"; close.textContent = "Закрыть"; close.dataset.closeDetails = "true";
+      head.append(title, close);
+      const grid = doc.createElement("div"); grid.style.cssText = "display:grid;grid-template-columns:repeat(2,1fr);gap:16px"; fill(grid);
+      dialog.append(head, grid); overlay.append(dialog); doc.body.append(overlay);
+    }
+  }
+
+  // Главная «Нужно загрузить документы»: что именно запросил банк и что уже загружено
+  if (!employee && name.includes("MissingDocs") && !name.includes("Chat")) {
+    const section = Array.from(doc.querySelectorAll("section")).find(s => s.querySelector("h2")?.textContent?.includes("Нужно загрузить документы"));
+    const rows = section?.querySelector("div[style*='flex-direction:column']");
+    if (rows) {
+      rows.replaceChildren();
+      for (const request of bank.requests.filter(r => r.status === "open")) {
+        const types = list(request.requested_document_types).length ? (request.requested_document_types as string[]) : [];
+        const items = types.length ? types : [""];
+        for (const type of items) {
+          const uploaded = type && bank.documents.some(d => d.type === type && (d.info_request_id === request.id || (!d.info_request_id && str(d.created_at) >= str(request.created_at))));
+          const row = doc.createElement("div");
+          row.style.cssText = `padding:12px 16px;border-radius:12px;font-weight:600;background:${uploaded ? "#e3f4ea" : "#fff6d6"}`;
+          row.textContent = type ? `${DOCUMENT_LABELS[type] ?? type}${uploaded ? " - загружено" : ""}` : `Ответ на вопрос: ${str(request.message)}`;
+          rows.append(row);
+        }
+      }
+      if (!rows.children.length) { const row = doc.createElement("div"); row.className = "t"; row.textContent = "Запросов банка нет"; rows.append(row); }
+    }
+  }
+
+  // Карточка заявки у администратора: заголовок, параметры, исполнитель, оценка и решения
+  if (name.startsWith("AD_Detail") && app.id) {
+    const staff = object(detail.staff);
+    const scoring = object(detail.scoring);
+    const decisions = list(detail.decisions);
+    const offers = decisions.filter(d => ["approved", "conditional_approval"].includes(str(d.decision_type)));
+    const purposes: Record<string, string> = { working_capital: "Пополнение оборотных средств", equipment: "Покупка оборудования", business_expansion: "Развитие бизнеса", refinancing: "Рефинансирование", other: "Другая цель" };
+    // Текущий исполнитель; у завершённых - кто принял решение (андеррайтер) или писал заключение
+    const decidedBy = decisions.at(-1)?.decided_by_id;
+    const analystId = object(detail.credit_memo).analyst_id;
+    const performer = detail.assignee_id ? str(staff[str(detail.assignee_id)] ?? "назначен")
+      : decidedBy && staff[str(decidedBy)] ? `${str(staff[str(decidedBy)])} (андеррайтер)`
+      : analystId && staff[str(analystId)] ? `${str(staff[str(analystId)])} (аналитик)` : "ИИ-агент";
+    const title = doc.querySelector("h1");
+    if (title) title.textContent = `Заявка ${str(app.number)} · ${str(company.name ?? companyName)}`;
+    const values: Record<string, string> = {
+      "Цель": purposes[str(app.purpose)] ?? str(app.purpose),
+      "Обеспечение": app.has_collateral ? str(app.collateral_description ?? "Залог") : "Без залога",
+      "Маршрут": app.close_reason === "auto_declined" ? "Автоотказ" : scoring.risk_zone ? statusLabel(scoring.risk_zone) : "Ещё не определён",
+      "Исполнитель": performer,
+      "Офферы": offers.length ? offers.map(d => `${money(d.approved_amount)} · ${str(d.approved_term_months)} мес. · ${Number(d.interest_rate).toFixed(2).replace(".", ",")}%`).join("; ") : "не формировались",
+      "Договор": object(detail.contract).contract_number ? `${str(object(detail.contract).contract_number)} · ${statusLabel(object(detail.contract).status)}` : "нет",
+      "DSCR": scoring.dscr !== undefined && scoring.dscr !== null ? Number(scoring.dscr).toFixed(2).replace(".", ",") : "—",
+      "Debt Burden (аналитический)": scoring.debt_burden !== undefined && scoring.debt_burden !== null ? `${(Number(scoring.debt_burden) * 100).toFixed(2).replace(".", ",")} %` : "—",
+      "LTV": scoring.ltv !== undefined && scoring.ltv !== null ? `${(Number(scoring.ltv) * 100).toFixed(2).replace(".", ",")} %` : "не применимо (без залога)",
+      "Стоп-факторы": list(scoring.stop_factors).map(f => str(f.description)).join(", ") || (scoring.risk_zone ? "не сработали" : "—"),
+      "ИИ-оффер": object(detail.credit_memo).recommended_amount ? `${money(object(detail.credit_memo).recommended_amount)} · ${str(object(detail.credit_memo).recommended_term_months)} мес. · ${Number(object(detail.credit_memo).recommended_rate).toFixed(2).replace(".", ",")}%` : "не формировался",
+    };
+    for (const label of Array.from(doc.querySelectorAll("p.t"))) {
+      const key = label.textContent?.trim() ?? "";
+      if (key in values && label.nextElementSibling) label.nextElementSibling.textContent = values[key];
+    }
+    // Причины автоотказа - все сработавшие стоп-факторы, а не два поля макета
+    const reasons = Array.from(doc.querySelectorAll("p.t")).find(p => p.textContent?.trim() === "Стоп-фактор 1")?.closest("div[style*='grid']");
+    if (reasons) {
+      reasons.replaceChildren();
+      const factors = list(scoring.stop_factors);
+      const items: [string, string][] = factors.length ? factors.map((f, i) => [`Стоп-фактор ${i + 1}`, str(f.description)]) : [["Стоп-факторы", "не сработали"]];
+      items.push(["Офферы", values["Офферы"]], ["Договор", values["Договор"]]);
+      for (const [label, value] of items) {
+        const cell = doc.createElement("div"); const caption = doc.createElement("p"); caption.className = "t"; caption.textContent = label;
+        const text = doc.createElement("p"); text.style.cssText = "font-weight:600;margin-top:2px"; text.textContent = value; cell.append(caption, text); reasons.append(cell);
+      }
+    }
+  }
+
+  // Запрос экспертизы: выбор аналитика из списка (с загрузкой) вместо поля макета
+  if (name === "U_Expertise.dc.html") {
+    const field = doc.querySelector<HTMLInputElement>("#c2");
+    if (field) {
+      const select = doc.createElement("select"); select.id = "c2"; select.dataset.analyst = "true";
+      select.style.cssText = "width:100%;padding:12px;border:1px solid #d5d9de;border-radius:12px;font:inherit;background:#fff";
+      const auto = doc.createElement("option"); auto.value = ""; auto.textContent = "Автоматически: прежний аналитик заявки или наименее загруженный"; select.append(auto);
+      for (const analyst of bank.employees.filter(e => e.role === "credit_analyst")) {
+        const option = doc.createElement("option"); option.value = str(analyst.id);
+        option.textContent = `${str(analyst.full_name)} · в работе: ${str(analyst.active_applications)}`; select.append(option);
+      }
+      field.replaceWith(select);
+    }
+  }
+
+  // Контр-предложение: «было» - условия заявки и ставка предварительного расчёта,
+  // подсвечены только изменённые условия
+  if (!employee && name.includes("HomeCounter") && offer.approved_amount) {
+    const rate = (value: unknown) => value === undefined || value === null ? "—" : `${Number(value).toFixed(2).replace(".", ",")}% годовых`;
+    const wasCollateral = app.has_collateral ? str(app.collateral_description ?? "Залог") : "Без залога";
+    const tiles: Record<string, [string, string]> = {
+      "Сумма": [money(offer.approved_amount), money(app.requested_amount)],
+      "Срок": [`${str(offer.approved_term_months)} мес.`, `${str(app.requested_term_months)} мес.`],
+      "Ставка": [rate(offer.interest_rate), rate(bank.preApproval?.estimated_rate ?? bank.products.find(p => p.id === app.product_id)?.base_rate)],
+      "Обеспечение": [list(offer.conditions).map(c => str(c.description)).join(", ") || wasCollateral, wasCollateral],
+    };
+    const counter = Array.from(doc.querySelectorAll("section")).find(section => section.querySelector("h2")?.textContent?.includes("Контр-предложение"));
+    for (const label of Array.from(counter?.querySelectorAll("p.t") ?? [])) {
+      const tile = label.parentElement; const values = tiles[label.textContent?.trim() ?? ""];
+      if (!tile || !values) continue;
+      const [now, was] = values; const [, current, before] = Array.from(tile.children);
+      if (current) current.textContent = now;
+      if (before) before.textContent = `Было: ${was}`;
+      if (now === was) { (tile as HTMLElement).style.background = "transparent"; before?.remove(); }
+    }
   }
 
   if (!employee) {
     doc.querySelectorAll("p").forEach(p => { if (/^Причин[аы]:/.test(p.textContent?.trim() ?? "")) p.textContent = list(app.decline_reasons).map(r => r.advice ? `${str(r.message)}. ${str(r.advice)}` : str(r.message)).join("; ") || list(offer.reasons).map(r => str(r.message)).join("; ") || str(app.status_description); });
     const chips = doc.querySelectorAll("main > section > div > .chip, main > section > .chip");
-    chips.forEach(chip => { chip.textContent = str(app.status_description ?? statusLabel(app.status)); });
+    // В «Кредитах» - статус кредита (действует), на главной - описание этапа заявки
+    chips.forEach(chip => { chip.textContent = name.includes("Credits") && loan.status ? statusLabel(loan.status) : str(app.status_description ?? statusLabel(app.status)); });
     if (name.includes("Chat") && !name.includes("ChatEdit")) {
       const section = doc.querySelector("main > section");
       if (section) {
@@ -173,7 +402,7 @@ export function bindBank(html: string, name: string, bank: BankState & { draft: 
           const fields = object(object(item.card_payload).fields);
           if (item.message_type === "confirmation_card") {
             const card = doc.createElement("div"); card.style.cssText = "margin-top:12px;background:#fff;color:#0b1f35;border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px";
-            const rows: [string, unknown][] = [["Сумма", fields.amount ? money(fields.amount) : "—"], ["Срок", fields.term_months ? `${str(fields.term_months)} мес.` : "—"], ["Цель", fields.purpose_label ?? "—"], ["Залог", fields.collateral_label ?? "—"], ["Продукт", fields.product_name ?? "—"]];
+            const rows: [string, unknown][] = [["Сумма", fields.amount ? money(fields.amount) : "—"], ["Срок", fields.term_months ? `${str(fields.term_months)} мес.` : "—"], ["Цель", fields.purpose_label ?? "—"], ["Залог", fields.collateral_label ?? "Не указан"], ["Продукт", fields.product_name ?? "—"]];
             for (const [label, value] of rows) {
               const row = doc.createElement("div"); row.style.cssText = "display:flex;justify-content:space-between;gap:16px";
               const caption = doc.createElement("span"); caption.style.color = "#5c6b7a"; caption.textContent = label;
@@ -183,7 +412,42 @@ export function bindBank(html: string, name: string, bank: BankState & { draft: 
           }
           anchor?.after(bubble); anchor = bubble;
         }
-        if (app.id && Array.isArray(app.available_actions) && app.available_actions.includes("upload_documents")) {
+        // После отказа - быстрые вопросы агенту (кнопки макета были внутри убранного сообщения)
+        if (app.close_reason === "auto_declined" || app.close_reason === "underwriter_declined") {
+          const quick = doc.createElement("div"); quick.style.cssText = "display:flex;gap:8px;flex-wrap:wrap";
+          for (const label of ["Уточнить причину", "Что можно исправить"]) { const button = doc.createElement("button"); button.className = "bs"; button.textContent = label; quick.append(button); }
+          anchor?.after(quick); anchor = quick;
+        }
+        // Запрос документов банка: по строке на каждый требуемый документ, загрузка с типом
+        // и привязкой к запросу, затем один ответ банку
+        const openRequests = bank.requests.filter(r => r.status === "open");
+        if (openRequests.length) {
+          const panel = doc.createElement("div"); panel.dataset.docRequests = "true";
+          panel.style.cssText = "max-width:560px;background:#fff6d6;border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:10px";
+          const heading = doc.createElement("p"); heading.style.fontWeight = "600"; heading.textContent = "Запрос банка"; panel.append(heading);
+          for (const request of openRequests) {
+            const message = doc.createElement("p"); message.className = "t"; message.textContent = str(request.message); panel.append(message);
+            for (const type of list(request.requested_document_types).length ? (request.requested_document_types as string[]) : []) {
+              const row = doc.createElement("div"); row.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:12px;background:#fff;border-radius:12px;padding:10px 12px";
+              const title = doc.createElement("span"); title.textContent = DOCUMENT_LABELS[type] ?? type;
+              const uploaded = bank.documents.filter(d => d.type === type && (d.info_request_id === request.id || (!d.info_request_id && str(d.created_at) >= str(request.created_at))));
+              if (uploaded.length) {
+                const done = doc.createElement("span"); done.style.cssText = "color:#0a6b3a;font-weight:600"; done.textContent = `✓ ${uploaded.map(d => str(d.file_name)).join(", ")}`; row.append(title, done);
+              } else {
+                const pick = doc.createElement("label"); pick.className = "bs"; pick.style.cssText = "cursor:pointer;padding:8px 14px"; pick.textContent = "Выбрать файл";
+                const input = doc.createElement("input"); input.type = "file"; input.hidden = true; input.accept = ".pdf,.xlsx,.xls,.docx,.csv,.png,.jpg,.jpeg";
+                input.dataset.upload = "true"; input.dataset.docType = type; input.dataset.requestId = str(request.id);
+                pick.append(input); row.append(title, pick);
+              }
+              panel.append(row);
+            }
+          }
+          const hint = doc.createElement("p"); hint.className = "t"; hint.textContent = "Комментарий можно написать в поле сообщения ниже - он уйдёт вместе с ответом.";
+          const send = doc.createElement("button"); send.className = "bt"; send.style.alignSelf = "flex-start"; send.textContent = "Отправить документы банку";
+          panel.append(hint, send);
+          const inputRow = section.querySelector('input[aria-label="Сообщение"]')?.closest("div");
+          if (inputRow && inputRow.parentElement === section) section.insertBefore(panel, inputRow); else section.append(panel);
+        } else if (app.id && Array.isArray(app.available_actions) && app.available_actions.includes("upload_documents")) {
           const upload = doc.createElement("label"); upload.style.cssText = "border:1px dashed #5c6b7a;border-radius:12px;padding:16px;cursor:pointer";
           upload.textContent = "Выбрать документ для заявки";
           const input = doc.createElement("input"); input.type = "file"; input.hidden = true; input.dataset.upload = "true"; input.accept = ".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg";

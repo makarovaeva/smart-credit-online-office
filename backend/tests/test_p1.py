@@ -16,8 +16,8 @@ from app.models import (
     Notification,
     User,
 )
-from app.models.enums import ApplicationStatus
-from tests.conftest import auth
+from app.models.enums import ApplicationStatus, UserRole
+from tests.conftest import auth, make_user
 from tests.test_applications_api import at_underwriter, set_status
 from tests.test_pipeline import start, submit
 
@@ -349,3 +349,47 @@ async def test_info_request_remind_and_cancel(
     application = await session.get(Application, draft["id"])
     await session.refresh(application)
     assert application.status == S.UNDERWRITER_REVIEW
+
+
+# --- Выбор аналитика и имена сотрудников ---
+
+
+async def test_underwriter_chooses_analyst_for_expertise(
+    api: AsyncClient, session: AsyncSession, underwriter: User, analyst: User, draft: dict
+) -> None:
+    second = await make_user(session, "analyst2@example.com", UserRole.CREDIT_ANALYST)
+    employees = await api.get(
+        "/api/v1/backoffice/employees", params={"role": "credit_analyst"}, headers=auth(underwriter)
+    )
+    assert employees.status_code == 200
+    assert {e["id"] for e in employees.json()} == {str(analyst.id), str(second.id)}
+    assert all(e["active_applications"] == 0 for e in employees.json())
+
+    await at_underwriter(session, draft["id"])
+    body = {
+        "decision_type": "more_information_required",
+        "more_info_target": "credit_analyst",
+        "comment": "Оцените залог",
+    }
+    wrong = await api.post(
+        f"/api/v1/backoffice/applications/{draft['id']}/decision",
+        json=body | {"analyst_id": str(underwriter.id)},
+        headers=auth(underwriter),
+    )
+    assert wrong.status_code == 422
+    await decide(api, underwriter, draft["id"], body | {"analyst_id": str(second.id)})
+    application = await session.get(Application, draft["id"])
+    await session.refresh(application)
+    assert application.assignee_id == second.id
+    assert "application_assigned" in [n.type for n in await notes(session, second)]
+
+    detail = (
+        await api.get(f"/api/v1/backoffice/applications/{draft['id']}", headers=auth(second))
+    ).json()
+    assert detail["staff"][str(second.id)] == second.full_name
+    assert detail["staff"][str(underwriter.id)] == underwriter.full_name
+    client = await api.get(
+        "/api/v1/backoffice/employees",
+        headers=auth(await make_user(session, "c@example.com", UserRole.CLIENT, "+79990000777")),
+    )
+    assert client.status_code == 403
