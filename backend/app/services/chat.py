@@ -444,9 +444,23 @@ def rule_reply(text: str, context: Context) -> Reply:
             if handler is _decline and context.decline_reason is None:
                 continue
             return handler(context)
+    if context.open_requests:
+        # Пока банк ждёт ответа, непонятное сообщение - скорее всего попытка ответить
+        return _answer_hint(context)
     if any(w in lower for w in ("привет", "здравств", "добрый")):
         return Reply(ChatMessageType.TEXT, "Здравствуйте! " + HELP)
     return Reply(ChatMessageType.TEXT, HELP)
+
+
+def _answer_hint(context: Context) -> Reply:
+    asked = "\n".join(f"• {r.message}" for r in context.open_requests)
+    return Reply(
+        ChatMessageType.DOCUMENT_REQUEST,
+        f"Банк ждёт ответа на запрос:\n{asked}\nСообщения в чат банк не получает. Ответьте в "
+        "блоке «Запрос банка»: напишите пояснение в поле «Ваш ответ банку», при необходимости "
+        "приложите файлы и нажмите кнопку отправки.",
+        info_request_ids=[r.id for r in context.open_requests],
+    )
 
 
 # --- Сообщения ---
