@@ -10,7 +10,7 @@ export const money = (value: unknown) => {
 };
 const date = (value: unknown) => value ? new Date(String(value)).toLocaleDateString("ru-RU") : "—";
 const statuses: Record<string, string> = { draft: "Черновик", pre_approved: "Предварительное одобрение", underwriter_review: "Рассмотрение", analyst_escalation: "Эскалация аналитику", analyst_completed: "Заключение готово", need_additional_data: "Нужны документы", offer_generated: "Оффер сформирован", e_sign: "Договор на подписание", disbursement: "Выдача средств", completed: "Кредит выдан", closed: "Заявка закрыта" };
-Object.assign(statuses, { data_collection: "Сбор данных", submitted: "Заявка отправлена", ai_verification: "Проверка документов", ai_financial_analysis: "Финансовый анализ", ai_risk_scoring: "Оценка риска", decision_routing: "Маршрутизация заявки", offer_accepted: "Оффер принят", offer_rejected: "Оффер отклонён", contract_generation: "Подготовка договора", approved: "Одобрено", conditional_approval: "Одобрено с изменениями", declined: "Отказано", more_information_required: "Запрошены данные", accepted: "Принят", rejected: "Отклонён", active: "Действует", green: "Зелёная зона", yellow: "Жёлтая зона", red: "Красная зона" });
+Object.assign(statuses, { data_collection: "Сбор данных", submitted: "Заявка отправлена", ai_verification: "Проверка документов", ai_financial_analysis: "Финансовый анализ", ai_risk_scoring: "Оценка риска", decision_routing: "Маршрутизация заявки", offer_accepted: "Оффер принят", offer_rejected: "Оффер отклонён", contract_generation: "Подготовка договора", approved: "Одобрено", conditional_approval: "Одобрено с изменениями", declined: "Отказано", more_information_required: "Запрошены данные", approve: "одобрить", counter_offer: "контр-предложение", decline: "отказать", request_more_info: "запросить данные", accepted: "Принят", rejected: "Отклонён", active: "Действует", green: "Зелёная зона", yellow: "Жёлтая зона", red: "Красная зона" });
 const legalForms: Record<string, string> = { ooo: "ООО", ip: "ИП" };
 const taxSystems: Record<string, string> = { usn_income: "УСН «Доходы»", usn_income_expense: "УСН «Доходы минус расходы»", osno: "ОСНО", psn: "Патент", eshn: "ЕСХН" };
 const DOCUMENT_LABELS: Record<string, string> = { bank_statement: "Выписка по расчётному счёту за 12 месяцев", tax_return: "Налоговая декларация", kudir: "КУДИР", financial_statement: "Бухгалтерская отчётность", management_report: "Управленческая отчётность", contract: "Договор с контрагентом", egrn_extract: "Выписка из ЕГРН на залог", vehicle_passport: "ПТС транспортного средства", equipment_documents: "Документы на оборудование", appraisal_report: "Отчёт об оценке залога", credit_agreement: "Кредитный договор", other: "Другой документ" };
@@ -102,7 +102,7 @@ export function bindBank(html: string, name: string, bank: BankState & { draft: 
   }
   if (employee) doc.querySelectorAll("p").forEach(p => {
     if (p.textContent?.startsWith("AI Credit Memo:")) p.textContent = str(object(detail.credit_memo).summary ?? "Кредитное заключение пока не сформировано");
-    if (p.textContent?.startsWith("Рекомендация:")) p.textContent = `${str(object(detail.credit_memo).analyst_recommendation)}. ${str(object(detail.credit_memo).analyst_conclusion)}`;
+    if (p.textContent?.startsWith("Рекомендация:")) p.textContent = object(detail.credit_memo).analyst_conclusion ? `Рекомендация: ${statusLabel(object(detail.credit_memo).analyst_recommendation)}. ${str(object(detail.credit_memo).analyst_conclusion)}` : "Заключения аналитика нет: заявка пришла к андеррайтеру напрямую";
   });
   const fields: Record<string, unknown> = {
     "Сумма": money((displayedOffer ? offer.approved_amount : app.requested_amount) ?? bank.draft.amount), "Сумма кредита": money(loan.principal_amount),
@@ -369,6 +369,58 @@ export function bindBank(html: string, name: string, bank: BankState & { draft: 
     }
   }
 
+  // Карточка заявки у аналитика: зачем заявка пришла (запрос андеррайтера или причины ИИ),
+  // параметры, оценка ИИ, AI Credit Memo и дозапросы - вместо заглушек макета
+  if (name.startsWith("A_") && app.id) {
+    const card = doc.querySelector("aside.b");
+    const header = card?.firstElementChild;
+    if (card && header) {
+      for (const child of Array.from(card.children)) if (child !== header && !child.querySelector("a, button")) child.remove();
+      const staff = object(detail.staff);
+      const memo = object(detail.credit_memo);
+      const scoring = object(detail.scoring);
+      const pct = (value: unknown) => `${(Number(value) * 100).toFixed(0)}%`;
+      const box = (title: string, lines: string[], tone = "#f3f4f5") => {
+        const block = doc.createElement("div"); block.style.cssText = `background:${tone};border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:4px`;
+        const caption = doc.createElement("p"); caption.className = "t"; caption.textContent = title; block.append(caption);
+        for (const line of lines) { const p = doc.createElement("p"); p.style.whiteSpace = "pre-line"; p.textContent = line; block.append(p); }
+        return block;
+      };
+      const blocks: HTMLElement[] = [];
+      const expertise = list(detail.internal_requests).filter(r => ["open", "accepted"].includes(str(r.status))).at(-1);
+      if (expertise) {
+        const state = expertise.status === "accepted" ? `в работе с ${date(expertise.accepted_at)}` : "ждёт принятия";
+        blocks.push(box(`Запрос экспертизы от андеррайтера · ${str(staff[str(expertise.from_user_id)] ?? "андеррайтер")} · ${date(expertise.created_at)} · ${state}`, [str(expertise.message)], "#fff6d6"));
+      }
+      const reasons = list(scoring.escalation_reasons).map(r => `• ${str(r.description)}`);
+      if (reasons.length) blocks.push(box(expertise ? "Основания эскалации от ИИ" : "Причина эскалации (ИИ)", reasons, expertise ? "#f3f4f5" : "#fff6d6"));
+      const purposes: Record<string, string> = { working_capital: "пополнение оборотных средств", equipment: "покупка оборудования", business_expansion: "развитие бизнеса", refinancing: "рефинансирование", other: "другая цель" };
+      blocks.push(box(`Заявка ${str(app.number)}`, [
+        `${money(app.requested_amount)} на ${str(app.requested_term_months)} мес., ${purposes[str(app.purpose)] ?? str(app.purpose)}`,
+        app.has_collateral ? `Залог: ${str(app.collateral_description ?? app.collateral_type)}, ${money(app.collateral_market_value)}` : "Без залога",
+        `ИНН ${str(company.inn)}${company.registration_date ? ` · зарегистрирована ${date(company.registration_date)}` : ""}`,
+      ]));
+      if (scoring.risk_zone) blocks.push(box("Оценка ИИ", [
+        `${statusLabel(scoring.risk_zone)} · Risk Grade ${str(scoring.risk_grade)} · балл ${str(scoring.score)} · уверенность ${pct(scoring.confidence)}`,
+        `DSCR ${scoring.dscr ? Number(scoring.dscr).toFixed(2).replace(".", ",") : "—"} · Debt Burden ${scoring.debt_burden ? pct(scoring.debt_burden) : "—"} · LTV ${scoring.ltv ? pct(scoring.ltv) : "не применимо"}`,
+        memo.recommended_amount ? `Рекомендация ИИ: ${statusLabel(memo.ai_recommendation)}, ${money(memo.recommended_amount)} на ${str(memo.recommended_term_months)} мес. под ${Number(memo.recommended_rate).toFixed(2).replace(".", ",")}%` : `Рекомендация ИИ: ${statusLabel(memo.ai_recommendation)}`,
+      ]));
+      if (memo.summary) {
+        const summary = box("AI Credit Memo", [str(memo.summary)]);
+        summary.style.maxHeight = "220px"; summary.style.overflowY = "auto"; blocks.push(summary);
+      }
+      const openRequests = list(detail.info_requests).filter(r => r.status === "open");
+      if (openRequests.length) blocks.push(box("Ждём от клиента", openRequests.map(r => `• ${str(r.message)}`), "#fff6d6"));
+      if (memo.analyst_conclusion) blocks.push(box(`Прежнее заключение аналитика · ${statusLabel(memo.analyst_recommendation)}`, [str(memo.analyst_conclusion)]));
+      header.after(...blocks);
+      // Запрос экспертизы, назначенный на меня и ещё не принятый, - принять в работу
+      const actions = Array.from(card.children).find(child => child.querySelector("a, button"));
+      if (expertise?.status === "open" && detail.assignee_id === bank.user?.id && actions && !Array.from(actions.querySelectorAll("a, button")).some(el => el.textContent?.trim() === "Принять в работу")) {
+        const accept = doc.createElement("button"); accept.className = "bs"; accept.textContent = "Принять в работу"; actions.prepend(accept);
+      }
+    }
+  }
+
   // Контр-предложение: «было» - условия заявки и ставка предварительного расчёта,
   // подсвечены только изменённые условия
   if (!employee && name.includes("HomeCounter") && offer.approved_amount) {
@@ -455,10 +507,24 @@ export function bindBank(html: string, name: string, bank: BankState & { draft: 
               }
               panel.append(row);
             }
+            // Запрос без документов (пояснение) - по желанию можно приложить файл
+            if (!list(request.requested_document_types).length) {
+              const attached = bank.documents.filter(d => d.info_request_id === request.id);
+              const row = doc.createElement("div"); row.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:12px;background:#fff;border-radius:12px;padding:10px 12px";
+              const title = doc.createElement("span"); title.className = "t"; title.textContent = attached.length ? `Приложено: ${attached.map(d => str(d.file_name)).join(", ")}` : "Файл к ответу (необязательно)";
+              const pick = doc.createElement("label"); pick.className = "bs"; pick.style.cssText = "cursor:pointer;padding:8px 14px"; pick.textContent = "Приложить файл";
+              const input = doc.createElement("input"); input.type = "file"; input.hidden = true; input.accept = ".pdf,.xlsx,.xls,.docx,.csv,.png,.jpg,.jpeg";
+              input.dataset.upload = "true"; input.dataset.docType = "other"; input.dataset.requestId = str(request.id);
+              pick.append(input); row.append(title, pick); panel.append(row);
+            }
           }
-          const hint = doc.createElement("p"); hint.className = "t"; hint.textContent = "Комментарий можно написать в поле сообщения ниже - он уйдёт вместе с ответом.";
-          const send = doc.createElement("button"); send.className = "bt"; send.style.alignSelf = "flex-start"; send.textContent = "Отправить документы банку";
-          panel.append(hint, send);
+          // Ответ пишется здесь: поле сообщения чата отправляет вопрос агенту, а не ответ банку
+          const answer = doc.createElement("textarea"); answer.dataset.answer = "true";
+          answer.placeholder = "Ваш ответ банку: пояснение или комментарий к документам";
+          answer.style.cssText = "width:100%;min-height:72px;padding:10px 12px;border:1px solid #d5d9de;border-radius:12px;font:inherit;background:#fff;box-sizing:border-box";
+          const needsFiles = openRequests.some(r => list(r.requested_document_types).length);
+          const send = doc.createElement("button"); send.className = "bt"; send.style.alignSelf = "flex-start"; send.textContent = needsFiles ? "Отправить документы банку" : "Отправить ответ банку";
+          panel.append(answer, send);
           const inputRow = section.querySelector('input[aria-label="Сообщение"]')?.closest("div");
           if (inputRow && inputRow.parentElement === section) section.insertBefore(panel, inputRow); else section.append(panel);
         } else if (app.id && Array.isArray(app.available_actions) && app.available_actions.includes("upload_documents")) {

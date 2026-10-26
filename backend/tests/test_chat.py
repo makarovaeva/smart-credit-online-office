@@ -245,3 +245,34 @@ async def test_dialog_before_application_joins_it(
     assert reply["card_payload"]["action"]["action_type"] == "update_application"
     assert reply["card_payload"]["fields"]["amount"] == "4000000.00"
     assert reply["card_payload"]["fields"]["term_months"] == 36
+
+
+async def test_free_text_during_open_request_points_to_answer(
+    api: AsyncClient,
+    session: AsyncSession,
+    client_user: User,
+    analyst: User,
+    draft: dict,
+) -> None:
+    from tests.test_applications_api import set_status
+
+    application = await set_status(session, draft["id"], "analyst_escalation")
+    application.assignee_id = analyst.id
+    await session.flush()
+    await api.post(
+        f"/api/v1/backoffice/applications/{draft['id']}/info-requests",
+        json={"message": "Нужно: пояснение по структуре бизнеса"},
+        headers=auth(analyst),
+    )
+    reply = (
+        await send(
+            api,
+            client_user,
+            draft["company_id"],
+            "У нас два учредителя",
+            application_id=draft["id"],
+        )
+    )["reply"]
+    assert reply["message_type"] == "document_request"
+    assert "Ваш ответ банку" in reply["content"]
+    assert "пояснение по структуре бизнеса" in reply["content"]

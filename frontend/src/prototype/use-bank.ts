@@ -264,14 +264,15 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
           body = { decision_type: approve ? "approved" : "conditional_approval", approved_amount: approve ? app?.requested_amount : cleanAmount(inputs[0]?.value ?? ""), approved_term_months: approve ? app?.requested_term_months : Number(inputs[1]?.value), interest_rate: rate, comment: textarea, conditions: approve ? list(memo.recommended_conditions) : inputs[3]?.value ? [{ code: "security", description: inputs[3].value }] : [] };
         }
         await post(`/backoffice/applications/${id}/decision`, body); await load(id); transition("U_Workspace.dc.html");
-      } else if (text === "Отправить документы банку") {
+      } else if (text === "Отправить документы банку" || text === "Отправить ответ банку") {
         if (!id) throw new Error("Сначала выберите заявку");
         const open = latest.current.requests.filter(r => r.status === "open");
         if (!open.length) throw new Error("Открытых запросов банка нет");
-        const input = root.querySelector<HTMLInputElement>('input[aria-label="Сообщение"]');
-        const message = input?.value.trim() || null;
+        const answer = root.querySelector<HTMLTextAreaElement>("textarea[data-answer]");
+        const message = answer?.value.trim() || null;
+        if (open.some(r => !list(r.requested_document_types).length) && !message) throw new Error("Напишите ответ банку в поле «Ваш ответ банку»");
         for (const request of open) await post(`/applications/${id}/info-requests/${request.id}/answer`, { message });
-        if (input) input.value = "";
+        if (answer) answer.value = "";
         const updated = await api(`/applications/${id}`);
         await load(id); transition(homeScene(updated));
       } else if (text === "Отправить" && current.includes("Chat") && root.querySelector<HTMLInputElement>('input[aria-label="Сообщение"]')?.value.trim()) {
