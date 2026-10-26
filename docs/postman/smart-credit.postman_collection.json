@@ -125,11 +125,12 @@
                   "  if (err || res.code !== 200) return;",
                   "  for (const app of res.json().items) {",
                   "    if (['completed', 'closed'].includes(app.status)) continue;",
-                  "    const command = app.status === 'offer_generated' ? 'offer/reject' : 'cancel';",
+                  "    const command = app.status === 'offer_generated' ? 'offer/reject'",
+                  "      : ['e_sign', 'disbursement'].includes(app.status) ? 'sign' : 'cancel';",
                   "    pm.sendRequest({",
                   "      url: `${base}/applications/${app.id}/${command}`, method: 'POST',",
                   "      header: { ...auth, 'Content-Type': 'application/json' },",
-                  "      body: { mode: 'raw', raw: '{}' },",
+                  "      body: { mode: 'raw', raw: '{\"confirmation_code\": \"123456\"}' },",
                   "    }, () => {});",
                   "  }",
                   "});"
@@ -636,11 +637,11 @@
                   "const base = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl');",
                   "const appId = pm.collectionVariables.get('applicationId');",
                   "pm.collectionVariables.set('underwriterToken', tokenOf(pm.response));",
-                  "pm.sendRequest({",
-                  "  url: `${base}/backoffice/applications/${appId}`,",
-                  "  header: { Authorization: `Bearer ${tokenOf(pm.response)}` },",
+                  "const auth = { Authorization: `Bearer ${tokenOf(pm.response)}` };",
+                  "pm.sendRequest({ url: `${base}/me`, header: auth }, (errMe, me) => pm.sendRequest({",
+                  "  url: `${base}/backoffice/applications/${appId}`, header: auth,",
                   "}, (err, res) => {",
-                  "  if (!err && res.code === 200) return;",
+                  "  if (!err && res.code === 200 && res.json().assignee_id === me.json().id) return;",
                   "  pm.sendRequest({",
                   "    url: `${base}/auth/login`, method: 'POST',",
                   "    header: { 'Content-Type': 'application/json' },",
@@ -649,7 +650,7 @@
                   "      password: pm.environment.get('employeePassword'),",
                   "    }) },",
                   "  }, (err2, res2) => pm.collectionVariables.set('underwriterToken', tokenOf(res2)));",
-                  "});"
+                  "}));"
                 ]
               }
             }
@@ -1258,11 +1259,12 @@
                   "  if (err || res.code !== 200) return;",
                   "  for (const app of res.json().items) {",
                   "    if (['completed', 'closed'].includes(app.status)) continue;",
-                  "    const command = app.status === 'offer_generated' ? 'offer/reject' : 'cancel';",
+                  "    const command = app.status === 'offer_generated' ? 'offer/reject'",
+                  "      : ['e_sign', 'disbursement'].includes(app.status) ? 'sign' : 'cancel';",
                   "    pm.sendRequest({",
                   "      url: `${base}/applications/${app.id}/${command}`, method: 'POST',",
                   "      header: { ...auth, 'Content-Type': 'application/json' },",
-                  "      body: { mode: 'raw', raw: '{}' },",
+                  "      body: { mode: 'raw', raw: '{\"confirmation_code\": \"123456\"}' },",
                   "    }, () => {});",
                   "  }",
                   "});"
@@ -1483,11 +1485,11 @@
                   "const base = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl');",
                   "const appId = pm.collectionVariables.get('counterAppId');",
                   "pm.collectionVariables.set('counterUwToken', tokenOf(pm.response));",
-                  "pm.sendRequest({",
-                  "  url: `${base}/backoffice/applications/${appId}`,",
-                  "  header: { Authorization: `Bearer ${tokenOf(pm.response)}` },",
+                  "const auth = { Authorization: `Bearer ${tokenOf(pm.response)}` };",
+                  "pm.sendRequest({ url: `${base}/me`, header: auth }, (errMe, me) => pm.sendRequest({",
+                  "  url: `${base}/backoffice/applications/${appId}`, header: auth,",
                   "}, (err, res) => {",
-                  "  if (!err && res.code === 200) return;",
+                  "  if (!err && res.code === 200 && res.json().assignee_id === me.json().id) return;",
                   "  pm.sendRequest({",
                   "    url: `${base}/auth/login`, method: 'POST',",
                   "    header: { 'Content-Type': 'application/json' },",
@@ -1496,7 +1498,7 @@
                   "      password: pm.environment.get('employeePassword'),",
                   "    }) },",
                   "  }, (err2, res2) => pm.collectionVariables.set('counterUwToken', tokenOf(res2)));",
-                  "});"
+                  "}));"
                 ]
               }
             }
@@ -1712,11 +1714,12 @@
                   "  if (err || res.code !== 200) return;",
                   "  for (const app of res.json().items) {",
                   "    if (['completed', 'closed'].includes(app.status)) continue;",
-                  "    const command = app.status === 'offer_generated' ? 'offer/reject' : 'cancel';",
+                  "    const command = app.status === 'offer_generated' ? 'offer/reject'",
+                  "      : ['e_sign', 'disbursement'].includes(app.status) ? 'sign' : 'cancel';",
                   "    pm.sendRequest({",
                   "      url: `${base}/applications/${app.id}/${command}`, method: 'POST',",
                   "      header: { ...auth, 'Content-Type': 'application/json' },",
-                  "      body: { mode: 'raw', raw: '{}' },",
+                  "      body: { mode: 'raw', raw: '{\"confirmation_code\": \"123456\"}' },",
                   "    }, () => {});",
                   "  }",
                   "});"
@@ -2018,11 +2021,12 @@
                   "  if (err || res.code !== 200) return;",
                   "  for (const app of res.json().items) {",
                   "    if (['completed', 'closed'].includes(app.status)) continue;",
-                  "    const command = app.status === 'offer_generated' ? 'offer/reject' : 'cancel';",
+                  "    const command = app.status === 'offer_generated' ? 'offer/reject'",
+                  "      : ['e_sign', 'disbursement'].includes(app.status) ? 'sign' : 'cancel';",
                   "    pm.sendRequest({",
                   "      url: `${base}/applications/${app.id}/${command}`, method: 'POST',",
                   "      header: { ...auth, 'Content-Type': 'application/json' },",
-                  "      body: { mode: 'raw', raw: '{}' },",
+                  "      body: { mode: 'raw', raw: '{\"confirmation_code\": \"123456\"}' },",
                   "    }, () => {});",
                   "  }",
                   "});"
@@ -2244,11 +2248,11 @@
                   "const base = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl');",
                   "const appId = pm.collectionVariables.get('escalationAppId');",
                   "pm.collectionVariables.set('analystToken', tokenOf(pm.response));",
-                  "pm.sendRequest({",
-                  "  url: `${base}/backoffice/applications/${appId}`,",
-                  "  header: { Authorization: `Bearer ${tokenOf(pm.response)}` },",
+                  "const auth = { Authorization: `Bearer ${tokenOf(pm.response)}` };",
+                  "pm.sendRequest({ url: `${base}/me`, header: auth }, (errMe, me) => pm.sendRequest({",
+                  "  url: `${base}/backoffice/applications/${appId}`, header: auth,",
                   "}, (err, res) => {",
-                  "  if (!err && res.code === 200) return;",
+                  "  if (!err && res.code === 200 && res.json().assignee_id === me.json().id) return;",
                   "  pm.sendRequest({",
                   "    url: `${base}/auth/login`, method: 'POST',",
                   "    header: { 'Content-Type': 'application/json' },",
@@ -2257,7 +2261,7 @@
                   "      password: pm.environment.get('employeePassword'),",
                   "    }) },",
                   "  }, (err2, res2) => pm.collectionVariables.set('analystToken', tokenOf(res2)));",
-                  "});"
+                  "}));"
                 ]
               }
             }
@@ -2474,11 +2478,12 @@
                   "  if (err || res.code !== 200) return;",
                   "  for (const app of res.json().items) {",
                   "    if (['completed', 'closed'].includes(app.status)) continue;",
-                  "    const command = app.status === 'offer_generated' ? 'offer/reject' : 'cancel';",
+                  "    const command = app.status === 'offer_generated' ? 'offer/reject'",
+                  "      : ['e_sign', 'disbursement'].includes(app.status) ? 'sign' : 'cancel';",
                   "    pm.sendRequest({",
                   "      url: `${base}/applications/${app.id}/${command}`, method: 'POST',",
                   "      header: { ...auth, 'Content-Type': 'application/json' },",
-                  "      body: { mode: 'raw', raw: '{}' },",
+                  "      body: { mode: 'raw', raw: '{\"confirmation_code\": \"123456\"}' },",
                   "    }, () => {});",
                   "  }",
                   "});"
@@ -2921,11 +2926,11 @@
                   "const base = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl');",
                   "const appId = pm.collectionVariables.get('docsAppId');",
                   "pm.collectionVariables.set('docsUwToken', tokenOf(pm.response));",
-                  "pm.sendRequest({",
-                  "  url: `${base}/backoffice/applications/${appId}`,",
-                  "  header: { Authorization: `Bearer ${tokenOf(pm.response)}` },",
+                  "const auth = { Authorization: `Bearer ${tokenOf(pm.response)}` };",
+                  "pm.sendRequest({ url: `${base}/me`, header: auth }, (errMe, me) => pm.sendRequest({",
+                  "  url: `${base}/backoffice/applications/${appId}`, header: auth,",
                   "}, (err, res) => {",
-                  "  if (!err && res.code === 200) return;",
+                  "  if (!err && res.code === 200 && res.json().assignee_id === me.json().id) return;",
                   "  pm.sendRequest({",
                   "    url: `${base}/auth/login`, method: 'POST',",
                   "    header: { 'Content-Type': 'application/json' },",
@@ -2934,7 +2939,7 @@
                   "      password: pm.environment.get('employeePassword'),",
                   "    }) },",
                   "  }, (err2, res2) => pm.collectionVariables.set('docsUwToken', tokenOf(res2)));",
-                  "});"
+                  "}));"
                 ]
               }
             }

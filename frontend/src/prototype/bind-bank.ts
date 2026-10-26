@@ -17,7 +17,7 @@ const DOCUMENT_LABELS: Record<string, string> = { bank_statement: "Выписк�
 export const statusLabel = (value: unknown) => statuses[str(value)] ?? str(value);
 const terminal = (a: ObjectData) => ["closed", "completed"].includes(str(a.status));
 
-function tabRows(name: string, rows: ObjectData[]) {
+function tabRows(name: string, rows: ObjectData[], userId?: unknown) {
   if (name.startsWith("AD_")) {
     if (name.includes("InWork")) return rows.filter(a => !terminal(a));
     if (name.includes("Closed")) return rows.filter(a => a.status === "closed");
@@ -28,7 +28,8 @@ function tabRows(name: string, rows: ObjectData[]) {
   if (name === "A_AnalystFromUw.dc.html") return rows.filter(a => a.status === "analyst_escalation" && !!a.expertise_request);
   if (name === "A_AnalystInWork.dc.html") return rows.filter(a => a.status === "need_additional_data");
   if (name === "U_Pending.dc.html") return rows.filter(a => a.status === "underwriter_review");
-  if (name === "U_Mine.dc.html") return rows;
+  // «Мои» - назначенные на меня и те, с которыми я уже работал (общая очередь этапа - во «Все»)
+  if (name === "U_Mine.dc.html") return rows.filter(a => a.assignee_id === userId || a.status !== "underwriter_review");
   if (name === "U_Requests.dc.html") return rows.filter(a => ["analyst_escalation", "need_additional_data"].includes(str(a.status)));
   return rows;
 }
@@ -61,15 +62,15 @@ export function bindBank(html: string, name: string, bank: BankState & { draft: 
     if (tbody) {
       const count = doc.querySelectorAll("table thead th").length;
       const original = tbody.querySelector("tr"); tbody.replaceChildren();
-      for (const row of tabRows(name, bank.applications)) {
+      for (const row of tabRows(name, bank.applications, bank.user?.id)) {
         const tr = original ? original.cloneNode(true) as HTMLTableRowElement : doc.createElement("tr");
         tr.style.background = row.id === app.id ? "#f3f4f5" : "transparent";
         tr.replaceChildren(); tr.dataset.applicationId = str(row.id); tr.style.cursor = "pointer";
         const values = name.startsWith("AD_")
-          ? [row.number, row.company_name, money(row.requested_amount), statusLabel(row.status), row.risk_zone, row.assignee_id === bank.user?.id ? "Вы" : "—"]
+          ? [row.number, row.company_name, money(row.requested_amount), statusLabel(row.status), row.risk_zone, row.assignee_id === bank.user?.id ? "Вы" : str(row.assignee_name ?? "—")]
           : name.startsWith("A_")
             ? [row.number, row.company_name, money(row.requested_amount), row.risk_zone, statusLabel(row.status)]
-            : [row.number, row.company_name, money(row.requested_amount), row.risk_zone, statusLabel(row.status), row.assignee_id === bank.user?.id ? "Вы" : "—"];
+            : [row.number, row.company_name, money(row.requested_amount), row.risk_zone, statusLabel(row.status), row.assignee_id === bank.user?.id ? "Вы" : str(row.assignee_name ?? "—")];
         values.forEach((value, index) => {
           const td = doc.createElement("td"); td.style.padding = "12px 8px";
           if (["green", "yellow", "red"].includes(str(value))) {
@@ -352,6 +353,19 @@ export function bindBank(html: string, name: string, bank: BankState & { draft: 
         option.textContent = `${str(analyst.full_name)} · в работе: ${str(analyst.active_applications)}`; select.append(option);
       }
       field.replaceWith(select);
+    }
+  }
+
+  // Заявка этапа, назначенная коллеге: видна всей очереди, решение - после «Взять в работу»
+  if (employee && app.id && detail.assignee_id && detail.assignee_id !== bank.user?.id) {
+    const stage = bank.user?.role === "underwriter" ? "underwriter_review" : bank.user?.role === "credit_analyst" ? "analyst_escalation" : null;
+    const card = doc.querySelector("aside.b");
+    if (stage && app.status === stage && card) {
+      const note = doc.createElement("p"); note.className = "t";
+      note.textContent = `Исполнитель: ${str(object(detail.staff)[str(detail.assignee_id)] ?? "коллега")}. Чтобы принять решение, возьмите заявку себе.`;
+      const take = doc.createElement("button"); take.className = "bt"; take.style.alignSelf = "flex-start"; take.textContent = "Взять в работу";
+      const heading = card.querySelector(":scope > div");
+      (heading ?? card.firstElementChild)?.after(note, take);
     }
   }
 

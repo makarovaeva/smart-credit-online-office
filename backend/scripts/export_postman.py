@@ -92,7 +92,7 @@ def js_expect(expr: str, value: str) -> str:
 
 def js_close_active(token: str) -> list[str]:
     """Закрыть незавершённые заявки клиента с прошлых прогонов: у компании одна заявка в
-    работе. До решения - отмена, на этапе оффера - отказ от оффера."""
+    работе. До решения - отмена, на этапе оффера - отказ от оффера, на подписании - подпись."""
     return f"""
 const base = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl');
 const auth = {{ Authorization: `Bearer ${{pm.collectionVariables.get('{token}')}}` }};
@@ -100,11 +100,12 @@ pm.sendRequest({{ url: `${{base}}/applications?limit=100`, header: auth }}, (err
   if (err || res.code !== 200) return;
   for (const app of res.json().items) {{
     if (['completed', 'closed'].includes(app.status)) continue;
-    const command = app.status === 'offer_generated' ? 'offer/reject' : 'cancel';
+    const command = app.status === 'offer_generated' ? 'offer/reject'
+      : ['e_sign', 'disbursement'].includes(app.status) ? 'sign' : 'cancel';
     pm.sendRequest({{
       url: `${{base}}/applications/${{app.id}}/${{command}}`, method: 'POST',
       header: {{ ...auth, 'Content-Type': 'application/json' }},
-      body: {{ mode: 'raw', raw: '{{}}' }},
+      body: {{ mode: 'raw', raw: '{{"confirmation_code": "123456"}}' }},
     }}, () => {{}});
   }}
 }});
@@ -178,18 +179,19 @@ def client_start(prefix: str, phone: str, amount: str, term: int = 36) -> list[d
 
 def employee_login(name: str, var: str, emails: tuple[str, str], app_id: str) -> dict[str, Any]:
     """Вход сотрудника, которому назначена заявка: назначение автоматическое (по загрузке),
-    поэтому скрипт пробует первого и, если заявка не его, входит вторым."""
+    а очередь этапа общая - скрипт сверяет исполнителя заявки с вошедшим и при
+    необходимости входит вторым."""
     first, second = emails
     script = f"""
 const tokenOf = (res) => res.json().access_token;
 const base = pm.environment.get('baseUrl') || pm.collectionVariables.get('baseUrl');
 const appId = pm.collectionVariables.get('{app_id}');
 pm.collectionVariables.set('{var}', tokenOf(pm.response));
-pm.sendRequest({{
-  url: `${{base}}/backoffice/applications/${{appId}}`,
-  header: {{ Authorization: `Bearer ${{tokenOf(pm.response)}}` }},
+const auth = {{ Authorization: `Bearer ${{tokenOf(pm.response)}}` }};
+pm.sendRequest({{ url: `${{base}}/me`, header: auth }}, (errMe, me) => pm.sendRequest({{
+  url: `${{base}}/backoffice/applications/${{appId}}`, header: auth,
 }}, (err, res) => {{
-  if (!err && res.code === 200) return;
+  if (!err && res.code === 200 && res.json().assignee_id === me.json().id) return;
   pm.sendRequest({{
     url: `${{base}}/auth/login`, method: 'POST',
     header: {{ 'Content-Type': 'application/json' }},
@@ -198,7 +200,7 @@ pm.sendRequest({{
       password: pm.environment.get('employeePassword'),
     }}) }},
   }}, (err2, res2) => pm.collectionVariables.set('{var}', tokenOf(res2)));
-}});
+}}));
 """.strip().splitlines()
     return request(
         name,

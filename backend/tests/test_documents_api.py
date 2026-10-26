@@ -259,7 +259,8 @@ async def test_underwriter_request_returns_to_underwriter(
     content = await api.get(url, headers=auth(underwriter))
     assert content.status_code == 200
     assert content.content == b"PK\x03\x04xlsx"
-    stranger = await make_user(session, "uw2@example.com", UserRole.UNDERWRITER)
+    # Аналитик, не работавший с заявкой андеррайтера, её не видит
+    stranger = await make_user(session, "an-other@example.com", UserRole.CREDIT_ANALYST)
     assert (await api.get(url, headers=auth(stranger))).status_code == 404
 
 

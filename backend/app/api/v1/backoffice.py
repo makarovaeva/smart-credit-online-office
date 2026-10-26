@@ -73,10 +73,13 @@ async def list_applications(
     limit: Limit = 20,
     offset: Offset = 0,
 ) -> Page[BackofficeApplicationItem]:
-    """Свои заявки сотрудника, старые первыми: назначенные на него и те, с которыми он уже
-    работал. Заявка назначается автоматически: на analyst_escalation - аналитику,
-    на underwriter_review - андеррайтеру. Текущая очередь аналитика - status=analyst_escalation,
-    андеррайтера - status=underwriter_review. Администратор видит все заявки."""
+    """Заявки сотрудника, старые первыми: общая очередь его этапа (андеррайтер - все
+    underwriter_review, аналитик - все analyst_escalation; исполнитель - assignee_name),
+    назначенные на него и те, с которыми он уже работал. Решает только исполнитель, чужую
+    заявку этапа можно взять себе через /assign. Заявка назначается автоматически:
+    на analyst_escalation - аналитику, на underwriter_review - андеррайтеру. Текущая очередь
+    аналитика - status=analyst_escalation, андеррайтера - status=underwriter_review.
+    Администратор видит все заявки."""
     items, total = await backoffice.list_queue(
         session, employee, statuses=status_in, risk_zone=risk_zone, limit=limit, offset=offset
     )

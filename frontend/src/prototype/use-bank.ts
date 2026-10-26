@@ -219,6 +219,9 @@ export function useBank(name: ScreenName, transition: (next: ScreenName, replace
         // Чат по текущей заявке; в макетах это то ссылка, то кнопка без обработчика
         setState(previous => ({ ...previous, detailsOpen: false }));
         transition(app && !["draft", "pre_approved"].includes(str(app.status)) ? "S1_ChatSubmitted.dc.html" : "S1_Chat.dc.html");
+      } else if (text === "Взять в работу" && id && latest.current.user) {
+        await post(`/backoffice/applications/${id}/assign`, { assignee_id: latest.current.user.id });
+        await load(id);
       } else if (text === "Детали заявки" && !current.startsWith("A") && !current.startsWith("U")) {
         if (!id) throw new Error("Сначала выберите заявку");
         latest.current = { ...latest.current, detailsOpen: true };

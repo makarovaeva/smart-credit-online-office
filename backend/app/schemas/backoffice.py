@@ -27,6 +27,7 @@ class BackofficeApplicationItem(ApplicationShort):
     company_name: str
     company_inn: str
     assignee_id: uuid.UUID | None
+    assignee_name: str | None = None
     risk_grade: RiskGrade | None
     risk_zone: RiskZone | None
     expertise_request: InternalRequestStatus | None = Field(
