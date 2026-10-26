@@ -44,7 +44,7 @@ def test_normalize_phone() -> None:
         normalize_phone("+1 555 0100")
 
 
-async def test_assigned_to_least_loaded_and_queues_are_separate(
+async def test_assigned_to_least_loaded_and_stage_queue_is_shared(
     api: AsyncClient,
     session: AsyncSession,
     client_user: User,
@@ -63,10 +63,12 @@ async def test_assigned_to_least_loaded_and_queues_are_separate(
     assert assignees == {underwriter.id, underwriter2.id}
     assert (await session.get(Application, young)).assignee_id == analyst.id
 
-    mine = await queue(api, underwriter)
-    others = await queue(api, underwriter2)
-    assert len(mine) == len(others) == 1
-    assert set(mine) != set(others)
+    # Общая очередь этапа: оба андеррайтера видят обе заявки, исполнитель - в assignee_name
+    response = await api.get(QUEUE, headers=auth(underwriter))
+    items = {i["id"]: i["assignee_name"] for i in response.json()["items"]}
+    assert set(items) == {first, second}
+    assert set(items.values()) == {underwriter.full_name, underwriter2.full_name}
+    assert set(await queue(api, underwriter2)) == {first, second}
     assert await queue(api, analyst) == [young]
     assert set(await queue(api, admin)) == {first, second, young}
 
@@ -99,7 +101,7 @@ async def test_processed_applications_stay_in_queue(
     assert await queue(api, underwriter, status="underwriter_review") == []
 
 
-async def test_detail_and_decision_only_for_own(
+async def test_colleague_sees_but_decides_only_after_taking(
     api: AsyncClient,
     session: AsyncSession,
     client_user: User,
@@ -123,14 +125,19 @@ async def test_detail_and_decision_only_for_own(
     assert len(body["external_checks"]) == 8
     assert body["company"]["inn"] == "7701000001"
 
-    assert (await api.get(f"{QUEUE}/{app_id}", headers=auth(stranger))).status_code == 404
+    # Коллега по этапу видит карточку, но решает только исполнитель
+    assert (await api.get(f"{QUEUE}/{app_id}", headers=auth(stranger))).status_code == 200
     assert (await api.get(f"{QUEUE}/{app_id}", headers=auth(client_user))).status_code == 403
-    decision = await api.post(
-        f"{QUEUE}/{app_id}/decision",
-        json={"decision_type": "declined", "reasons": [{"code": "x", "message": "x"}]},
-        headers=auth(stranger),
-    )
+    decline = {"decision_type": "declined", "reasons": [{"code": "x", "message": "x"}]}
+    decision = await api.post(f"{QUEUE}/{app_id}/decision", json=decline, headers=auth(stranger))
     assert decision.status_code == 403
+    # «Взять в работу» - передать заявку себе, после этого решение доступно
+    taken = await api.post(
+        f"{QUEUE}/{app_id}/assign", json={"assignee_id": str(stranger.id)}, headers=auth(stranger)
+    )
+    assert taken.status_code == 200, taken.text
+    decision = await api.post(f"{QUEUE}/{app_id}/decision", json=decline, headers=auth(stranger))
+    assert decision.status_code == 201, decision.text
 
 
 async def test_expertise_returns_to_the_same_underwriter(
@@ -193,7 +200,9 @@ async def test_reassign(
     assert response.status_code == 200, response.text
     assert response.json()["assignee_id"] == str(colleague.id)
     assert await queue(api, colleague) == [app_id]
-    assert await queue(api, owner) == []
+    # Заявка этапа остаётся в общей очереди, но уже у коллеги
+    listed = (await api.get(QUEUE, headers=auth(owner))).json()["items"]
+    assert [i["assignee_name"] for i in listed] == [colleague.full_name]
 
 
 async def test_products_catalog(api: AsyncClient, product: CreditProduct) -> None:

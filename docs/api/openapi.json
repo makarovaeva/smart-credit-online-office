@@ -3309,7 +3309,7 @@
           "backoffice"
         ],
         "summary": "List Applications",
-        "description": "Свои заявки сотрудника, старые первыми: назначенные на него и те, с которыми он уже\nработал. Заявка назначается автоматически: на analyst_escalation - аналитику,\nна underwriter_review - андеррайтеру. Текущая очередь аналитика - status=analyst_escalation,\nандеррайтера - status=underwriter_review. Администратор видит все заявки.",
+        "description": "Заявки сотрудника, старые первыми: общая очередь его этапа (андеррайтер - все\nunderwriter_review, аналитик - все analyst_escalation; исполнитель - assignee_name),\nназначенные на него и те, с которыми он уже работал. Решает только исполнитель, чужую\nзаявку этапа можно взять себе через /assign. Заявка назначается автоматически:\nна analyst_escalation - аналитику, на underwriter_review - андеррайтеру. Текущая очередь\nаналитика - status=analyst_escalation, андеррайтера - status=underwriter_review.\nАдминистратор видит все заявки.",
         "operationId": "list_applications_api_v1_backoffice_applications_get",
         "security": [
           {
@@ -6173,6 +6173,17 @@
               }
             ],
             "title": "Assignee Id"
+          },
+          "assignee_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Name"
           },
           "risk_grade": {
             "anyOf": [

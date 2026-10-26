@@ -1,7 +1,9 @@
-"""Заявки глазами сотрудника банка: свои очереди, карточка, переназначение.
+"""Заявки глазами сотрудника банка: очереди, карточка, переназначение.
 
-«Свои» заявки - назначенные на сотрудника и те, с которыми он уже работал (есть его действие
-в истории статусов). Администратор видит все.
+Сотрудник видит заявки своего этапа (общая очередь: андеррайтер - все на рассмотрении,
+аналитик - все эскалации), назначенные на него и те, с которыми он уже работал. Решение
+принимает только исполнитель; чужую заявку этапа можно взять себе (assign). Администратор
+видит все.
 """
 
 import uuid
@@ -10,6 +12,7 @@ from typing import Any
 from sqlalchemy import Select, func, or_, select
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.models import (
     Application,
@@ -54,7 +57,13 @@ def _mine(user: User):
     processed = select(ApplicationStatusHistory.application_id).where(
         ApplicationStatusHistory.actor_id == user.id
     )
-    return or_(Application.assignee_id == user.id, Application.id.in_(processed))
+    # Общая очередь этапа: иначе заявку, назначенную коллеге, не видно вовсе
+    stage = [status for status, role in STAGE_ROLES.items() if role == user.role]
+    return or_(
+        Application.assignee_id == user.id,
+        Application.id.in_(processed),
+        Application.status.in_(stage),
+    )
 
 
 def _visible(query: Select, user: User) -> Select:
@@ -97,6 +106,7 @@ async def list_queue(
         .limit(1)
         .scalar_subquery()
     )
+    assignee = aliased(User)
     query = _visible(
         select(
             Application,
@@ -105,8 +115,10 @@ async def list_queue(
             scoring.c.risk_zone,
             scoring.c.risk_grade,
             expertise,
+            assignee.full_name,
         )
         .join(Company, Company.id == Application.company_id)
+        .outerjoin(assignee, assignee.id == Application.assignee_id)
         .outerjoin(scoring, scoring.c.application_id == Application.id),
         user,
     )
@@ -128,9 +140,10 @@ async def list_queue(
                 "risk_zone": zone,
                 "risk_grade": grade,
                 "expertise_request": request_status,
+                "assignee_name": assignee_name,
             }
         )
-        for application, name, inn, zone, grade, request_status in rows
+        for application, name, inn, zone, grade, request_status, assignee_name in rows
     ]
     return items, total or 0
 

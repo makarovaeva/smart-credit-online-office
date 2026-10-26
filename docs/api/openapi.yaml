@@ -2096,10 +2096,13 @@ paths:
       - backoffice
       summary: List Applications
       description: |-
-        Свои заявки сотрудника, старые первыми: назначенные на него и те, с которыми он уже
-        работал. Заявка назначается автоматически: на analyst_escalation - аналитику,
-        на underwriter_review - андеррайтеру. Текущая очередь аналитика - status=analyst_escalation,
-        андеррайтера - status=underwriter_review. Администратор видит все заявки.
+        Заявки сотрудника, старые первыми: общая очередь его этапа (андеррайтер - все
+        underwriter_review, аналитик - все analyst_escalation; исполнитель - assignee_name),
+        назначенные на него и те, с которыми он уже работал. Решает только исполнитель, чужую
+        заявку этапа можно взять себе через /assign. Заявка назначается автоматически:
+        на analyst_escalation - аналитику, на underwriter_review - андеррайтеру. Текущая очередь
+        аналитика - status=analyst_escalation, андеррайтера - status=underwriter_review.
+        Администратор видит все заявки.
       operationId: list_applications_api_v1_backoffice_applications_get
       security:
       - HTTPBearer: []
@@ -3865,6 +3868,11 @@ components:
             format: uuid
           - type: 'null'
           title: Assignee Id
+        assignee_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Assignee Name
         risk_grade:
           anyOf:
           - $ref: '#/components/schemas/RiskGrade'

@@ -41,7 +41,8 @@ async function login(path, values, role) {
 async function closeActive() {
   const rows = (await api("/api/backend/applications?limit=100")).data.items;
   for (const app of rows.filter(a => !["completed", "closed"].includes(a.status))) {
-    await api(`/api/backend/applications/${app.id}/${app.status === "offer_generated" ? "offer/reject" : "cancel"}`, {});
+    const command = app.status === "offer_generated" ? "offer/reject" : ["e_sign", "disbursement"].includes(app.status) ? "sign" : "cancel";
+    await api(`/api/backend/applications/${app.id}/${command}`, { confirmation_code: "123456" });
   }
 }
 async function fixture() {
@@ -87,7 +88,9 @@ try {
   for (const number of [1, 2]) {
     await login("/staff/login?role=underwriter", [`underwriter${number}@alfa-demo.ru`, "demo-password"], "underwriter");
     const queue = await api("/api/backend/backoffice/applications?limit=100");
-    if (queue.data.items.some(a => a.id === application.id)) { found = true; break; }
+    // Очередь этапа общая - ищем того, на кого назначена заявка
+    const me = (await api("/api/session")).data.id;
+    if (queue.data.items.some(a => a.id === application.id && a.assignee_id === me)) { found = true; break; }
   }
   if (!found) throw new Error("Created application absent from underwriter queues");
   await wait(`!!document.querySelector('[data-application-id="${application.id}"]')`);
@@ -135,7 +138,8 @@ try {
   for (const number of [1, 2]) {
     await login("/staff/login?role=analyst", [`analyst${number}@alfa-demo.ru`, "demo-password"], "credit_analyst");
     const queue = await api("/api/backend/backoffice/applications?limit=100");
-    if (queue.data.items.some(a => a.id === escalation.id)) { analystFound = true; break; }
+    const me = (await api("/api/session")).data.id;
+    if (queue.data.items.some(a => a.id === escalation.id && a.assignee_id === me)) { analystFound = true; break; }
   }
   if (!analystFound) throw new Error("Escalation absent from analyst queues");
   const analystLogin = (await api("/api/session")).data.email;
