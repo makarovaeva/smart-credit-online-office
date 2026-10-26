@@ -38,3 +38,8 @@
   background: #fde4e2;
   color: #a3201a;
 }
+
+/* Кнопки макета без курсора-руки выглядели неактивными, хотя работают */
+.screen :global(button:not(:disabled)) {
+  cursor: pointer;
+}

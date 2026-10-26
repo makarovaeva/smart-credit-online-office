@@ -23,6 +23,7 @@ from app.models.enums import (
     DecisionType,
     InternalRequestStatus,
     MoreInfoTarget,
+    UserRole,
 )
 from app.schemas.decision import AnalystConclusionRequest, UnderwriterDecisionRequest
 from app.services.errors import (
@@ -163,6 +164,12 @@ async def make_decision(
         body = _with_alternative(body, memo)
     target = _target_status(body)
     ensure_transition(application.status, target, ActorType.UNDERWRITER)
+    if body.analyst_id is not None:
+        if target != S.ANALYST_ESCALATION:
+            raise ValidationFailedError("Аналитик выбирается только для запроса экспертизы")
+        analyst = await session.get(User, body.analyst_id)
+        if analyst is None or not analyst.is_active or analyst.role != UserRole.CREDIT_ANALYST:
+            raise ValidationFailedError("Выберите активного кредитного аналитика")
 
     is_offer = target == S.OFFER_GENERATED
     is_final = body.decision_type != DecisionType.MORE_INFORMATION_REQUIRED
@@ -211,6 +218,7 @@ async def make_decision(
         underwriter.id,
         comment=body.comment,
         close_reason=CloseReason.UNDERWRITER_DECLINED if target == S.CLOSED else None,
+        assignee_id=body.analyst_id,
     )
     if is_final:
         application.decided_at = now

@@ -156,10 +156,17 @@ try {
   console.log("Analyst document request sent to the client through UI");
 
   await login("/login", ["+7 999 000-00-04"], "client");
-  const uploaded = await evaluate(`(() => { const data = new FormData(); data.append("file", new Blob(["%PDF-1.4\\n%%EOF\\n"], { type: "application/pdf" }), "vypiska.pdf"); data.append("type", "bank_statement"); data.append("info_request_id", ${JSON.stringify(docRequest.id)}); return fetch("/api/backend/applications/${escalation.id}/documents", { method: "POST", body: data }).then(r => r.status); })()`);
-  if (uploaded !== 201) throw new Error(`Document upload failed: ${uploaded}`);
-  const answered = await api(`/api/backend/applications/${escalation.id}/info-requests/${docRequest.id}/answer`, { message: "Выписка приложена" });
-  if (answered.status !== 200) throw new Error(`Info request answer failed: ${JSON.stringify(answered)}`);
+  // Загрузка через интерфейс: главная «Нужно загрузить документы» -> чат -> выбор файла -> ответ банку
+  await navigate("/applications");
+  await wait(`document.body.innerText.includes('Нужно загрузить документы') && document.body.innerText.includes('Выписка по расчётному счёту за 12 месяцев')`);
+  await click("Загрузить в чате");
+  await wait("!!document.querySelector('[data-doc-requests] input[type=file]') && !document.querySelector('[aria-busy=true]')");
+  const { root: domRoot } = await command("DOM.getDocument", { depth: -1 });
+  const { nodeId: fileInput } = await command("DOM.querySelector", { nodeId: domRoot.nodeId, selector: "[data-doc-requests] input[type=file]" });
+  await command("DOM.setFileInputFiles", { nodeId: fileInput, files: [fileURLToPath(new URL("../../docs/postman/files/vypiska.pdf", import.meta.url))] });
+  await wait("document.querySelector('[data-doc-requests]')?.innerText.includes('✓ vypiska.pdf')");
+  await click("Отправить документы банку");
+  await wait("location.pathname === '/applications' && !document.querySelector('[aria-busy=true]')");
   if ((await api(`/api/backend/applications/${escalation.id}`)).data.status !== "analyst_escalation") throw new Error("Answered request did not return application to analyst");
   console.log("Client uploaded the document and answered; application returned to analyst");
 

@@ -87,6 +87,20 @@ export function ScreenView({ initialName }: { initialName: ScreenName }) {
   }, [initialName, remember, transition, bank.refresh]);
 
   useEffect(() => { document.title = screens[name].title; }, [name]);
+  // Поля выбора файла создаются в разметке макета, React о них не знает и onChange не вызывает -
+  // слушаем нативное событие change на документе
+  const uploadRef = useRef(bank.upload);
+  useEffect(() => { uploadRef.current = bank.upload; });
+  useEffect(() => {
+    const onChange = (event: Event) => {
+      const input = event.target as HTMLInputElement;
+      if (!input.closest?.("[data-screen-name]") || !input.dataset?.upload || !input.files?.[0]) return;
+      void uploadRef.current(input.files[0], input.dataset.docType, input.dataset.requestId);
+      input.value = "";
+    };
+    document.addEventListener("change", onChange);
+    return () => document.removeEventListener("change", onChange);
+  }, []);
 
   const html = useMemo(() => {
     const linked = screens[name].html.replace(/href="([^"]+)"/g, (attribute, target: string) => {
@@ -153,6 +167,6 @@ export function ScreenView({ initialName }: { initialName: ScreenName }) {
       {bank.error && <div role="alert" className={`${styles.notice} ${styles.error}`}>{bank.error}<button onClick={() => void bank.refresh()} style={{ marginLeft: 16 }}>Повторить загрузку</button></div>}
       {bank.warnings.length > 0 && protectedPage && <div role="status" className={`${styles.notice} ${styles.warning}`}>{bank.warnings.join(" · ")}</div>}
     </div>
-    {protectedPage && !bank.user ? <LoadingIndicator /> : <div className={styles.screen} ref={content} data-screen-name={name} data-api-ready={mounted} aria-busy={bank.busy} onClick={navigate} onChange={event => { const input = event.target as HTMLInputElement; if (input.dataset.upload && input.files?.[0]) void bank.upload(input.files[0]); }} dangerouslySetInnerHTML={{ __html: initialHtml }} />}
+    {protectedPage && !bank.user ? <LoadingIndicator /> : <div className={styles.screen} ref={content} data-screen-name={name} data-api-ready={mounted} aria-busy={bank.busy} onClick={navigate} dangerouslySetInnerHTML={{ __html: initialHtml }} />}
   </>;
 }

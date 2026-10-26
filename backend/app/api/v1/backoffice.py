@@ -18,11 +18,12 @@ from app.api.deps import (
     download,
     file_response,
 )
-from app.models.enums import ApplicationStatus, RiskZone
+from app.models.enums import ApplicationStatus, RiskZone, UserRole
 from app.schemas.backoffice import (
     AssignRequest,
     BackofficeApplicationDetail,
     BackofficeApplicationItem,
+    EmployeeRead,
     InternalRequestRead,
     ReturnRequestBody,
 )
@@ -49,6 +50,18 @@ from app.services.offers import to_decision_read
 router = APIRouter(
     prefix="/backoffice/applications", tags=["backoffice"], responses=AUTH_RESPONSES | NOT_FOUND
 )
+employees_router = APIRouter(
+    prefix="/backoffice/employees", tags=["backoffice"], responses=AUTH_RESPONSES
+)
+
+
+@employees_router.get("")
+async def list_employees(
+    employee: CurrentEmployee, session: SessionDep, role: UserRole | None = None
+) -> list[EmployeeRead]:
+    """Активные аналитики и андеррайтеры с числом заявок в работе - для выбора исполнителя
+    (аналитик для запроса экспертизы, коллега для передачи заявки)."""
+    return await backoffice.list_employees(session, role)
 
 
 @router.get("")

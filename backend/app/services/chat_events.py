@@ -33,6 +33,11 @@ def rub(value: Decimal | int | float | None) -> str:
     return text.replace(",", " ").replace(".", ",") + " ₽"
 
 
+def pct(value: Decimal | int | float) -> str:
+    """18 -> «18,00%»."""
+    return f"{Decimal(value):.2f}".replace(".", ",") + "%"
+
+
 async def _latest_decision(session: AsyncSession, application_id) -> CreditDecision | None:
     return await session.scalar(
         select(CreditDecision)
@@ -67,7 +72,7 @@ async def _offer_message(session: AsyncSession, application: Application) -> Cha
     assert decision is not None
     terms = (
         f"{rub(decision.approved_amount)} на {decision.approved_term_months} мес. "
-        f"под {decision.interest_rate}% годовых"
+        f"под {pct(decision.interest_rate)} годовых"
     )
     if decision.decision_type == DecisionType.CONDITIONAL_APPROVAL:
         text = f"Банк предлагает кредит на изменённых условиях: {terms}."

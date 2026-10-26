@@ -42,8 +42,8 @@ from app.models.enums import (
 )
 from app.schemas.chat import ChatMessageCreate
 from app.services import llm
-from app.services.applications import to_read
-from app.services.chat_events import rub
+from app.services.applications import decline_reasons, to_read
+from app.services.chat_events import pct, rub
 from app.services.errors import NotFoundError, ValidationFailedError
 
 S = ApplicationStatus
@@ -158,6 +158,8 @@ class Context:
     open_requests: list[InfoRequest] = field(default_factory=list)
     decision: CreditDecision | None = None
     decline_reason: str | None = None
+    # Что можно изменить, чтобы следующая заявка прошла (советы по стоп-факторам)
+    decline_advice: list[str] = field(default_factory=list)
 
 
 async def _context(
@@ -198,19 +200,11 @@ async def _context(
         .order_by(CreditDecision.created_at.desc())
         .limit(1)
     )
-    if application.close_reason == CloseReason.AUTO_DECLINED:
-        reason = await session.scalar(
-            select(ChatMessage.content)
-            .where(
-                ChatMessage.application_id == application.id,
-                ChatMessage.message_type == ChatMessageType.REJECTION_NOTICE,
-            )
-            .order_by(ChatMessage.created_at.desc())
-            .limit(1)
-        )
-        context.decline_reason = reason
-    elif application.close_reason == CloseReason.UNDERWRITER_DECLINED and context.decision:
-        context.decline_reason = "; ".join(r["message"] for r in context.decision.reasons)
+    if application.close_reason in (CloseReason.AUTO_DECLINED, CloseReason.UNDERWRITER_DECLINED):
+        # Причины и советы - те же, что клиент видит в заявке (decline_reasons)
+        reasons = await decline_reasons(session, application)
+        context.decline_reason = "; ".join(r.message for r in reasons) or None
+        context.decline_advice = [r.advice for r in reasons if r.advice]
     return context
 
 
@@ -235,7 +229,7 @@ def _facts_text(context: Context) -> str:
     ):
         lines.append(
             f"Решение банка: {decision.decision_type}, {rub(decision.approved_amount)} на "
-            f"{decision.approved_term_months} мес. под {decision.interest_rate}%."
+            f"{decision.approved_term_months} мес. под {pct(decision.interest_rate)}."
         )
     if context.decline_reason:
         lines.append(f"Причина отказа: {context.decline_reason}")
@@ -243,7 +237,7 @@ def _facts_text(context: Context) -> str:
         "Продукты: "
         + "; ".join(
             f"{p.name} от {rub(p.min_amount)} до {rub(p.max_amount)}, "
-            f"{p.min_term_months}-{p.max_term_months} мес., ставка от {p.base_rate}%"
+            f"{p.min_term_months}-{p.max_term_months} мес., ставка от {pct(p.base_rate)}"
             for p in context.products
         )
     )
@@ -301,6 +295,8 @@ def _card(request: LoanRequest, context: Context) -> Reply:
             if merged.collateral_type
             else "Без залога"
             if merged.has_collateral is False
+            else "Залог, тип не указан"
+            if merged.has_collateral
             else None
         ),
         "product_id": str(product.id) if product else None,
@@ -324,7 +320,9 @@ def _card(request: LoanRequest, context: Context) -> Reply:
     elif product is None:
         text += " Подходящего продукта на этих условиях нет - попробуйте изменить сумму или срок."
     else:
-        text += f" Подойдёт продукт «{product.name}» со ставкой от {product.base_rate}% годовых."
+        text += (
+            f" Подойдёт продукт «{product.name}» со ставкой от {pct(product.base_rate)} годовых."
+        )
         text += " Проверьте параметры и подтвердите заявку."
     action = "update_application" if editable else "create_application"
     return Reply(
@@ -376,7 +374,8 @@ def _offer(context: Context) -> Reply:
             ChatMessageType.TEXT,
             "Предложения банка пока нет: оно появится после рассмотрения заявки. "
             + (
-                f"Ориентир по ставке - от {min(p.base_rate for p in context.products)}% годовых."
+                f"Ориентир по ставке - от {pct(min(p.base_rate for p in context.products))}"
+                " годовых."
                 if context.products
                 else ""
             ),
@@ -388,7 +387,7 @@ def _offer(context: Context) -> Reply:
     )
     text = (
         f"Предложение банка{kind}: {rub(decision.approved_amount)} на "
-        f"{decision.approved_term_months} мес. под {decision.interest_rate}% годовых."
+        f"{decision.approved_term_months} мес. под {pct(decision.interest_rate)} годовых."
     )
     if context.application and context.application.status == S.OFFER_GENERATED:
         text += " Примите или отклоните его в разделе заявки."
@@ -399,8 +398,12 @@ def _decline(context: Context) -> Reply:
     if context.decline_reason:
         return Reply(
             ChatMessageType.REJECTION_NOTICE,
-            f"Причина отказа: {context.decline_reason.removeprefix('К сожалению, ')}"
-            " Можно подать новую заявку, когда ситуация изменится.",
+            f"Причина отказа: {context.decline_reason}."
+            + (
+                " Что можно сделать: " + "; ".join(context.decline_advice) + "."
+                if context.decline_advice
+                else " Можно подать новую заявку, когда ситуация изменится."
+            ),
         )
     return Reply(ChatMessageType.TEXT, "По этой заявке отказа нет.")
 
@@ -408,7 +411,7 @@ def _decline(context: Context) -> Reply:
 def _products(context: Context) -> Reply:
     lines = [
         f"• {p.name}: {rub(p.min_amount)} - {rub(p.max_amount)}, "
-        f"{p.min_term_months}-{p.max_term_months} мес., ставка от {p.base_rate}%"
+        f"{p.min_term_months}-{p.max_term_months} мес., ставка от {pct(p.base_rate)}"
         + (", нужен залог" if p.requires_collateral else "")
         for p in context.products
     ]
@@ -422,7 +425,7 @@ HELP = (
 )
 
 _INTENTS = (
-    (("отказ", "почему", "причин"), _decline),
+    (("отказ", "почему", "причин", "исправ", "что можно сделать"), _decline),
     (("документ", "выписк", "дозапрос", "загруз", "файл", "отчётност", "отчетност"), _documents),
     (("оффер", "предложени", "ставк", "платеж", "платёж", "одобр"), _offer),
     (("статус", "заявк", "когда", "что с", "этап", "рассмотр", "решени"), _status),

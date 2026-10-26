@@ -70,14 +70,20 @@ STAGE_TITLES = {
 }
 
 
-async def auto_assign(session: AsyncSession, application: Application) -> None:
+async def auto_assign(
+    session: AsyncSession, application: Application, preferred: uuid.UUID | None = None
+) -> None:
     """Назначает исполнителя под текущий статус и уведомляет его; вне этапов сотрудников -
-    снимает."""
+    снимает. preferred - выбранный сотрудник (например, аналитик для запроса экспертизы)."""
     role = STAGE_ROLES.get(application.status)
     if role is None:
         application.assignee_id = None
         return
-    application.assignee_id = await _pick(session, application, role)
+    chosen = await session.get(User, preferred) if preferred else None
+    if chosen is not None and chosen.is_active and chosen.role == role:
+        application.assignee_id = chosen.id
+    else:
+        application.assignee_id = await _pick(session, application, role)
     if application.assignee_id is not None:
         notifications.add(
             session,

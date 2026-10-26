@@ -93,6 +93,7 @@ cd backend && uv run python -m scripts.export_openapi
 | POST | `/auth/login` | аналитик, андеррайтер, админ | Вход по логину и паролю |
 | GET | `/backoffice/applications` | аналитик, андеррайтер, админ | Свои заявки, старые первыми; фильтры `status` (несколько значений) и `risk_zone` |
 | GET | `/backoffice/applications/{id}` | аналитик, андеррайтер, админ | Карточка своей заявки: компания, учредители, проверки, метрики, скоринг, AI Credit Memo, решения, история |
+| GET | `/backoffice/employees?role=` | аналитик, андеррайтер, админ | Активные аналитики и андеррайтеры с числом заявок в работе — для выбора исполнителя |
 | POST | `/backoffice/applications/{id}/assign` | сотрудник этапа, админ | Передать заявку другому сотруднику той же роли |
 | POST | `/backoffice/applications/{id}/analyst-conclusion` | аналитик | Заключение: `analyst_escalation → analyst_completed → underwriter_review` |
 | POST | `/backoffice/applications/{id}/info-requests` | аналитик (исполнитель) | Запрос документов у клиента через ИИ: `analyst_escalation → need_additional_data`, после ответа — обратно к аналитику |
@@ -102,7 +103,7 @@ cd backend && uv run python -m scripts.export_openapi
 | POST | `/backoffice/applications/{id}/info-requests/{rid}/cancel`, `/remind` | инициатор дозапроса | Отозвать дозапрос клиенту (возврат заявки к инициатору) / напомнить клиенту через ИИ-агента |
 | GET | `/backoffice/applications/{id}/contract/document`, `/contract/schedule-export` | аналитик, андеррайтер, админ | Те же выгрузки по своей заявке |
 | POST | `/backoffice/applications/{id}/contract` | аналитик (исполнитель) | Подготовка договора: `contract_generation → e_sign`. Нужна при `CONTRACT_PREPARATION=analyst`, в режиме `auto` договор готовится сам |
-| POST | `/backoffice/applications/{id}/decision` | андеррайтер | Одно из 4 решений. `more_information_required` с `more_info_target`: `client` — дозапрос документов, `credit_analyst` — запрос экспертизы. `conditional_approval` с `alternative_offer` берёт условия варианта из AI Credit Memo |
+| POST | `/backoffice/applications/{id}/decision` | андеррайтер | Одно из 4 решений. `more_information_required` с `more_info_target`: `client` — дозапрос документов, `credit_analyst` — запрос экспертизы (необязательный `analyst_id` — конкретный аналитик, иначе прежний или наименее загруженный). `conditional_approval` с `alternative_offer` берёт условия варианта из AI Credit Memo |
 
 Этапы `data_collection`, `ai_*`, `decision_routing` (включая автоотказ по стоп-фактору), `contract_generation`, `disbursement` двигает конвейер, публичных эндпоинтов для них нет. Внешние источники (ЕГРЮЛ, ФНС, БКИ, комплаенс) — внутренние модули-моки на профилях заёмщиков (формат Borrower Profile из [`../credit_mmb_data_model_updated.md`](../credit_mmb_data_model_updated.md)) в `app/integrations/`, описаны в [`../external-sources.md`](../external-sources.md).
 
